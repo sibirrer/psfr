@@ -20,7 +20,9 @@ def stack_psf(star_list, oversampling=1, saturation_limit=None, num_iteration=5,
     oversampling: integer, higher-resolution PSF reconstruction and return
     saturation_limit: float or list of floats for each star;
      pixel values abouve this threshold will not be considered in the reconstruction.
-    n_recenter: integer, every n_recenter iterations of the updated PSF, a re-centering of the centroids are performed with the updated PSF guess
+    n_recenter: integer
+        Every n_recenter iterations of the updated PSF, a re-centering of the centroids are performed with the updated
+        PSF guess.
     """
 
     n_star = len(star_list)
@@ -57,7 +59,7 @@ def stack_psf(star_list, oversampling=1, saturation_limit=None, num_iteration=5,
     # estimate center offsets based on base stacking
     center_list = []
     for i, star in enumerate(star_list):
-        x_c, y_c = _fit_centroid(star, star_stack_base, mask_list[i])
+        x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i])
         center_list.append([x_c, y_c])
     if verbose:
         print(center_list, 'center_list')
@@ -93,7 +95,7 @@ def stack_psf(star_list, oversampling=1, saturation_limit=None, num_iteration=5,
         if j % n_recenter == 0 and j != 0:
             center_list = []
             for i, star in enumerate(star_list):
-                x_c, y_c = _fit_centroid(star, psf_guess, mask_list[i], oversampling=oversampling)
+                x_c, y_c = centroid_fit(star, psf_guess, mask_list[i], oversampling=oversampling)
                 center_list.append([x_c, y_c])
         if verbose:
             plt.imshow(np.log(psf_guess), vmin=-5, vmax=-1)
@@ -183,7 +185,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
                 plt.imshow(residuals, origin='lower')
                 plt.title('residuals')
                 plt.show()
-            # renormalize residuals
+            # re-normalize residuals
             residuals /= amp  # devide by amplitude of point source
             # high-res version of residuals
             residuals_oversampled = residuals.repeat(oversampling, axis=0).repeat(oversampling, axis=1)
@@ -325,7 +327,7 @@ def _linear_amplitude(data, model, variance=None, mask=None):
     return amp
 
 
-def _fit_centroid(data, model, mask=None, variance=None, oversampling=1):
+def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
     """
     fit the centroid of the model to the image by shifting and scaling the model to best match the data
     This is done in a non-linear minimizer in the positions (x, y) and linear amplitude minimization on the fly.
@@ -395,4 +397,3 @@ def _image2oversampled(image, oversampling=1):
             # and the last column and row need to be removed
             image_oversampled = image_oversampled[1:, 1:]
     return image_oversampled
-

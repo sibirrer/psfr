@@ -30,10 +30,11 @@ test_linear_amplitude()
 def test_fit_centroid():
     from lenstronomy.LightModel.light_model import LightModel
     numpix = 21
-    n_c = (numpix - 1) / 2
-    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1, left_lower=True)
+    #n_c = (numpix - 1) / 2
+    n_c = 0
+    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
     gauss = LightModel(['GAUSSIAN'])
-    x_c, y_c = -0.6, 0.2
+    x_c, y_c = -0.5, 0.2
     kwargs_true = [{'amp': 2, 'sigma': 1, 'center_x': n_c + x_c, 'center_y': n_c + y_c}]
     kwargs_model = [{'amp': 1, 'sigma': 1, 'center_x': n_c, 'center_y': n_c}]
     flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_true)
@@ -44,7 +45,7 @@ def test_fit_centroid():
 
     mask = np.ones_like(flux_true)
 
-    center = psfr._fit_centroid(flux_true, flux_model, mask=mask, variance=None)
+    center = psfr.centroid_fit(flux_true, flux_model, mask=mask, variance=None)
     npt.assert_almost_equal(center[0], x_c, decimal=1)
     npt.assert_almost_equal(center[1], y_c, decimal=1)
 
