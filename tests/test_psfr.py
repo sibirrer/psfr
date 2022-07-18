@@ -3,11 +3,64 @@
 """Tests for `psfr` package."""
 
 from psfr import psfr
-
+from lenstronomy.Util import kernel_util
 import numpy.testing as npt
 import numpy as np
 from lenstronomy.Util import util
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+
+def test_shift_psf():
+    oversampling = 4
+    x, y = 0.2, -0.3
+    shift = [x, y]
+
+    from lenstronomy.LightModel.light_model import LightModel
+    gauss = LightModel(['GAUSSIAN'])
+    numpix = 21
+    num_pix_super = numpix * oversampling
+    oversampling = 4
+    if oversampling % 2 == 0:
+        num_pix_super += 1
+    sigma = 2
+    kwargs_true = [{'amp': 1, 'sigma': sigma, 'center_x': 0, 'center_y': 0}]
+    kwargs_shifted = [{'amp': 1, 'sigma': sigma, 'center_x': x, 'center_y': y}]
+    x_grid_super, y_grid_super = util.make_grid(numPix=num_pix_super, deltapix=1. / oversampling,
+                                                left_lower=False)
+    flux_true_super = gauss.surface_brightness(x_grid_super, y_grid_super, kwargs_true)
+    psf_true_super = util.array2image(flux_true_super)
+    psf_true_super /= np.sum(psf_true_super)
+
+    psf_shifted_super_true = gauss.surface_brightness(x_grid_super, y_grid_super, kwargs_shifted)
+    psf_shifted_super_true = util.array2image(psf_shifted_super_true)
+    psf_shifted_true = kernel_util.degrade_kernel(psf_shifted_super_true, degrading_factor=oversampling)
+    psf_shifted_true = kernel_util.cut_psf(psf_shifted_true, numpix)
+
+    psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=numpix)
+
+    if False:
+        import matplotlib.pyplot as plt
+        f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4), sharex=False, sharey=False)
+        vmin, vmax = -5, -1
+        ax = axes[0]
+        im = ax.imshow(psf_shifted_true - psf_shifted_psfr, origin='lower')
+        ax.autoscale(False)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        ax.set_title('True - Interpol shifted')
+        ax = axes[1]
+        im = ax.imshow(np.log10(psf_shifted_psfr), origin='lower', vmin=vmin, vmax=vmax)
+        ax.autoscale(False)
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        ax.set_title('PSF-r numerical shifted')
+        plt.show()
+
+    print(np.sum(np.abs(psf_shifted_true - psf_shifted_psfr)), 'sum of absolute residuals')
+    npt.assert_almost_equal(psf_shifted_true, psf_shifted_psfr, decimal=5)
 
 
 def test_linear_amplitude():
@@ -24,19 +77,15 @@ def test_linear_amplitude():
     npt.assert_almost_equal(amp_return, amp)
 
 
-test_linear_amplitude()
-
-
 def test_fit_centroid():
     from lenstronomy.LightModel.light_model import LightModel
-    numpix = 21
-    #n_c = (numpix - 1) / 2
-    n_c = 0
+    numpix = 41
+
     x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
     gauss = LightModel(['GAUSSIAN'])
-    x_c, y_c = -0.5, 0.2
-    kwargs_true = [{'amp': 2, 'sigma': 1, 'center_x': n_c + x_c, 'center_y': n_c + y_c}]
-    kwargs_model = [{'amp': 1, 'sigma': 1, 'center_x': n_c, 'center_y': n_c}]
+    x_c, y_c = -3.5, 2.2
+    kwargs_true = [{'amp': 2, 'sigma': 3, 'center_x': x_c, 'center_y': y_c}]
+    kwargs_model = [{'amp': 1, 'sigma': 3, 'center_x': 0, 'center_y': 0}]
     flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_true)
     flux_true = util.array2image(flux_true)
 
@@ -46,8 +95,8 @@ def test_fit_centroid():
     mask = np.ones_like(flux_true)
 
     center = psfr.centroid_fit(flux_true, flux_model, mask=mask, variance=None)
-    npt.assert_almost_equal(center[0], x_c, decimal=1)
-    npt.assert_almost_equal(center[1], y_c, decimal=1)
+    npt.assert_almost_equal(center[0], x_c, decimal=3)
+    npt.assert_almost_equal(center[1], y_c, decimal=3)
 
 
 def test_one_step_psf_estimation():

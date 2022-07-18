@@ -273,9 +273,8 @@ def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
     shift_y = shift[1] * oversampling
     # shift psf
     # TODO: what is optimal interpolation in the shift, or doing it in Fourier space instead?
-    psf_shifted1 = interpolation.shift(psf_center, [shift_y, shift_x], order=1)
-    psf_shifted2 = interpolation.shift(psf_center, [shift_y, shift_x], order=0)
-    psf_shifted = (psf_shifted1 + psf_shifted2) / 2
+    # Partial answer: interpolation in order=1 is better than order=0 (order=2 is even better for Gaussian PSF's)
+    psf_shifted = interpolation.shift(psf_center, [shift_y, shift_x], order=2)
 
     # resize to pixel scale (making sure the grid definition with the center in the central pixel is preserved)
     if degrade is True:
@@ -370,7 +369,7 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
 
     init = np.array([0, 0])
     x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
-                                bounds=((-2, 2), (-2, 2)), method='Nelder-Mead')
+                                bounds=((-5, 5), (-5, 5)), method='Nelder-Mead')
     return x.x
 
 
