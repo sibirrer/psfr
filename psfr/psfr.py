@@ -133,7 +133,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
 
         # shift PSF to position pre-determined to be the center of the point source, and degrate it to the image
         if oversampling > 1:
-            psf_shifted = _shift_psf(psf_guess, star, oversampling, center=center_list[i], degrade=False)
+            psf_shifted = shift_psf(psf_guess, star, oversampling, shift=center_list[i], degrade=False)
             if verbose:
                 plt.imshow(np.log10(psf_shifted), origin='lower', vmin=-5, vmax=-1)
                 plt.title('psf shifted')
@@ -143,7 +143,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             # make sure size is the same as the data
             psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
         else:
-            psf_shifted_data = _shift_psf(psf_guess, star, oversampling, center=center_list[i], degrade=True)
+            psf_shifted_data = shift_psf(psf_guess, star, oversampling, shift=center_list[i], degrade=True)
             psf_shifted = psf_shifted_data
 
         if verbose:
@@ -243,12 +243,12 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     return kernel_new
 
 
-def _shift_psf(psf_guess, star, oversampling, center, degrade=True):
+def shift_psf(psf_guess, star, oversampling, shift, degrade=True):
     """
     shift PSF to the star position and degrade to the image resolution afterwards
     """
-    shift_x = center[0] * oversampling
-    shift_y = center[1] * oversampling
+    shift_x = shift[0] * oversampling
+    shift_y = shift[1] * oversampling
     # shift psf
     psf_guess_shifted1 = interpolation.shift(psf_guess, [shift_y, shift_x], order=1)
     psf_guess_shifted2 = interpolation.shift(psf_guess, [shift_y, shift_x], order=0)
