@@ -31,6 +31,8 @@ setup(
     install_requires=requirements,
     long_description=readme + '\n\n' + history,
     include_package_data=True,
+    license = 'BSD 3-Clause',
+    license_file = 'LICENSE.rst',
     keywords='psfr',
     name='psfr',
     packages=find_packages(include=['psfr', 'psfr.*']),

@@ -133,7 +133,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
 
         # shift PSF to position pre-determined to be the center of the point source, and degrate it to the image
         if oversampling > 1:
-            psf_shifted = shift_psf(psf_guess, star, oversampling, shift=center_list[i], degrade=False)
+            psf_shifted = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=False, n_pix_star=len(star))
             if verbose:
                 plt.imshow(np.log10(psf_shifted), origin='lower', vmin=-5, vmax=-1)
                 plt.title('psf shifted')
@@ -143,7 +143,8 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             # make sure size is the same as the data
             psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
         else:
-            psf_shifted_data = shift_psf(psf_guess, star, oversampling, shift=center_list[i], degrade=True)
+            psf_shifted_data = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=True,
+                                         n_pix_star=len(star))
             psf_shifted = psf_shifted_data
 
         if verbose:
@@ -243,29 +244,66 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     return kernel_new
 
 
-def shift_psf(psf_guess, star, oversampling, shift, degrade=True):
+def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
     """
-    shift PSF to the star position and degrade to the image resolution afterwards
+    shift PSF to the star position. Optionally degrades to the image resolution afterwards
+
+    Parameters
+    ----------
+    psf_center : 2d numpy array with odd square length
+        Centered PSF in the oversampling space of the input
+    oversampling : integer >= 1
+        oversampling factor per axis of the psf_center relative to the data and coordinate shift
+    shift : [x, y], 2d floats
+        off-center shift in the units of the data
+    degrade : boolean
+        if True degrades the shifted PSF to the data resolution and cuts the resulting size to n_pix_star
+    n_pix_star : odd integer
+        size per axis of the data, used when degrading the shifted {SF
+
+    Returns
+    -------
+    psf_shifted : 2d numpy array, odd axis number
+        shifted PSF, optionally degraded to the data resolution
+
     """
     shift_x = shift[0] * oversampling
     shift_y = shift[1] * oversampling
     # shift psf
-    psf_guess_shifted1 = interpolation.shift(psf_guess, [shift_y, shift_x], order=1)
-    psf_guess_shifted2 = interpolation.shift(psf_guess, [shift_y, shift_x], order=0)
-    psf_guess_shifted = (psf_guess_shifted1 + psf_guess_shifted2) / 2
+    # TODO: what is optimal interpolation in the shift, or doing it in Fourier space instead?
+    psf_shifted1 = interpolation.shift(psf_center, [shift_y, shift_x], order=1)
+    psf_shifted2 = interpolation.shift(psf_center, [shift_y, shift_x], order=0)
+    psf_shifted = (psf_shifted1 + psf_shifted2) / 2
 
     # resize to pixel scale (making sure the grid definition with the center in the central pixel is preserved)
     if degrade is True:
-        psf_guess_shifted = kernel_util.degrade_kernel(psf_guess_shifted, degrading_factor=oversampling)
-        psf_guess_shifted = kernel_util.cut_psf(psf_guess_shifted, len(star))
-    return psf_guess_shifted
+        psf_shifted = kernel_util.degrade_kernel(psf_shifted, degrading_factor=oversampling)
+        psf_shifted = kernel_util.cut_psf(psf_shifted, n_pix_star)
+    return psf_shifted
 
 
 def _linear_amplitude(data, model, variance=None, mask=None):
     """
     computes linear least square amplitude to minimize
     min[(data - amp * model)^2 / variance]
-    returns amp
+
+    Parameters
+    ----------
+    data : 2d numpy array
+        the measured data (i.e. of a star or other point-like source)
+    model: 2d numpy array, same size as data
+        model prediction of the data, modulo a linear amplitude scaling
+        (i.e. a PSF model that is sub-pixel shifted to match the astrometric position of the star in the data)
+    variance : None, or 2d numpy array, same size as data
+        Variance in the uncorrelated uncertainties in the data for individual pixels
+    mask : None, or 2d integer or boolean array, same size as data
+        Masking pixels not to be considered in fitting the linear amplitude;
+        zeros are ignored, ones are taken into account. None as input takes all pixels into account (default)
+
+    Returns
+    -------
+    amp : float
+        linear amplitude such that (data - amp * model)^2 / variance is minimized
     """
     y = util.image2array(data)
     x = util.image2array(model)
@@ -287,33 +325,49 @@ def _linear_amplitude(data, model, variance=None, mask=None):
     return amp
 
 
-def _fit_centroid(image, model, mask=None, variance=None, oversampling=1):
+def _fit_centroid(data, model, mask=None, variance=None, oversampling=1):
     """
     fit the centroid of the model to the image by shifting and scaling the model to best match the data
-    This is done in a non-linear minimizer in the positions (x, y) and linear amplitude minimization on the fly
-    The model is interpolated to match the data. The starting point of the model is to be aligned with the image
+    This is done in a non-linear minimizer in the positions (x, y) and linear amplitude minimization on the fly.
+    The model is interpolated to match the data. The starting point of the model is to be aligned with the image.
+
+    Parameters
+    ----------
+    data : 2d numpy array
+        data of a point-like source for which a centroid position is required
+    model : 2d numpy array, odd squared length
+        a centered model of the PSF in oversampled space
+    mask : None, or 2d integer or boolean array, same size as data
+        Masking pixels not to be considered in fitting the linear amplitude;
+        zeros are ignored, ones are taken into account. None as input takes all pixels into account (default)
+    variance : None, or 2d numpy array, same size as data
+        Variance in the uncorrelated uncertainties in the data for individual pixels
+    oversampling : integer >= 1
+        oversampling factor per axis of the model relative to the data and coordinate shift
+
+    Returns
+    -------
+    center_shift : 2d array (delta_x, delta_y)
+        required shift in units of pixels in the data such that the model matches best the data
     """
 
-    def _minimize(x, image, model, variance=None, mask=None, oversampling=1):
-        shift_x = x[0] * oversampling
-        shift_y = x[1] * oversampling
-        # shift model
-        model_shifted = interpolation.shift(model, [shift_y, shift_x], order=1)
-        # down sample to data
-        model_shifted = kernel_util.degrade_kernel(model_shifted, degrading_factor=oversampling)
-        model_shifted = kernel_util.cut_psf(model_shifted, len(image))
+    def _minimize(x, data, model, variance=None, mask=None, oversampling=1):
+        # shift model to proposed astrometric position
+        model_shifted = shift_psf(psf_center=model, oversampling=oversampling, shift=x, degrade=True,
+                                  n_pix_star=len(data))
         # linear amplitude
-        amp = _linear_amplitude(image, model_shifted, variance=variance, mask=mask)
         if mask is None:
-            mask = np.ones_like(image)
+            mask = np.ones_like(data)
+        amp = _linear_amplitude(data, model_shifted, variance=variance, mask=mask)
+
         if variance is None:
             variance = 1
         # compute chi2
-        chi2 = np.sum((image - model_shifted * amp) ** 2 / variance * mask)
+        chi2 = np.sum((data - model_shifted * amp) ** 2 / variance * mask)
         return chi2
 
     init = np.array([0, 0])
-    x = scipy.optimize.minimize(_minimize, init, args=(image, model, variance, mask, oversampling),
+    x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
                                 bounds=((-2, 2), (-2, 2)), method='Nelder-Mead')
     return x.x
 
