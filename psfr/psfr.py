@@ -4,6 +4,8 @@ import scipy.optimize
 from scipy.ndimage import interpolation
 import matplotlib.pylab as plt
 from lenstronomy.Util import util, kernel_util, image_util
+from psfr.util import regular2oversampled, oversampled2data
+
 
 # TODO: change this dependency
 from lenstronomy.Workflow.psf_fitting import PsfFitting
@@ -17,7 +19,7 @@ def stack_psf(star_list, oversampling=1, saturation_limit=None, num_iteration=5,
     ----------
     star_list: list of numpy arrays (2D) of stars.
      Odd square axes with the approximate star within the center pixel. All stars need the same cutout size.
-    oversampling: integer, higher-resolution PSF reconstruction and return
+    oversampling : integer, higher-resolution PSF reconstruction and return
     saturation_limit: float or list of floats for each star;
      pixel values abouve this threshold will not be considered in the reconstruction.
     n_recenter: integer
@@ -105,9 +107,15 @@ def stack_psf(star_list, oversampling=1, saturation_limit=None, num_iteration=5,
 
 
 def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=None, step_factor=0.2,
-                          oversampling=1, verbose=False):
+                          oversampling=1, verbose=False, oversampled_residual_deshifting=False):
     """
 
+    Parameters
+    ----------
+    oversampled_residual_deshifting : boolean
+        if True; produces first an oversampled residual map and then de-shifts it back to the center for each star
+        if False; produces a residual map in the data space and de-shifts it into a higher resolution residual map for
+        stacking
     """
     if mask_list is None:
         mask_list = []
@@ -119,10 +127,6 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     for i, star in enumerate(star_list):
         center = center_list[i]
         # shift PSF guess to estimated position of star
-
-        # x_int = int(round(center[0]))
-        # y_int = int(round(center[1]))
-        # x_int, y_int = 0, 0
 
         if verbose:
             plt.imshow(np.log10(star), origin='lower', vmin=-5, vmax=-1)
@@ -154,14 +158,12 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             plt.title('psf shifted data')
             plt.show()
         # linear inversion in 1d
-
         amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list[i])
 
-        # TODO make residual map on higher resolution space
         # compute residuals on data
-        if False:  # directly in oversampled space
-            star_super = _image2oversampled(star, oversampling=oversampling)  # TODO: needs only be calculated once!
-            mask_super = _image2oversampled(mask_list[i], oversampling=oversampling)
+        if oversampled_residual_deshifting:  # directly in oversampled space
+            star_super = regular2oversampled(star, oversampling=oversampling)  # TODO: needs only be calculated once!
+            mask_super = regular2oversampled(mask_list[i], oversampling=oversampling)
             mask_super[mask_super < 1] = 0
             mask_super[mask_super >= 1] = 1
             residuals_oversampled = (star_super - amp * psf_shifted) * mask_super
@@ -170,8 +172,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             # inverse shift residuals
             shift_x = center[0] * oversampling
             shift_y = center[1] * oversampling
-
-            residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y, -shift_x], order=0)
+            residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y, -shift_x], order=1)
 
         else:  # in data space and then being oversampled
             residuals = (star - amp * psf_shifted_data) * mask_list[i]
@@ -199,22 +200,21 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             shift_y = center[1] * oversampling
             # for odd number super-sampling
             if oversampling % 2 == 1:
-                residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y, -shift_x], order=0)
+                residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y, -shift_x], order=1)
 
             else:
                 # for even number super-sampling half a super-sampled pixel offset needs to be performed
                 # TODO: move them in random direction in all four directions (not only two)
-                rand_num = np.random.randint(2)
-                if rand_num == 1:
-                    residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y - 0.5, -shift_x - 0.5],
-                                                            order=0)
-                    # and the last column and row need to be removed
-                    residuals_shifted = residuals_shifted[:-1, :-1]
-                else:
-                    residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y + 0.5, -shift_x + 0.5],
-                                                            order=0)
-                    # and the last column and row need to be removed
-                    residuals_shifted = residuals_shifted[1:, 1:]
+                residuals_shifted1 = interpolation.shift(residuals_oversampled, [-shift_y - 0.5, -shift_x - 0.5],
+                                                         order=1)
+                # and the last column and row need to be removed
+                residuals_shifted1 = residuals_shifted1[:-1, :-1]
+
+                residuals_shifted2 = interpolation.shift(residuals_oversampled, [-shift_y + 0.5, -shift_x + 0.5],
+                                                         order=1)
+                # and the last column and row need to be removed
+                residuals_shifted2 = residuals_shifted2[1:, 1:]
+                residuals_shifted = (residuals_shifted1 + residuals_shifted2) / 2
 
         # re-size shift residuals
         psf_size = len(psf_guess)
@@ -371,28 +371,3 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
     x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
                                 bounds=((-5, 5), (-5, 5)), method='Nelder-Mead')
     return x.x
-
-
-def _image2oversampled(image, oversampling=1):
-    """
-    makes each pixel n x n pixels (with n=oversampling), makes it such that center remains in center pixel
-    """
-    if oversampling == 1:
-        return image
-    image_oversampled = image.repeat(oversampling, axis=0).repeat(oversampling, axis=1)
-    if oversampling % 2 == 1:
-        pass  # this is already centered with odd total number of pixels
-
-    else:
-        # for even number super-sampling half a super-sampled pixel offset needs to be performed
-        # we do the shift and cut in random directions such that it averages out
-        rand_num = np.random.randint(2)
-        if rand_num == 0:
-            image_oversampled = interpolation.shift(image_oversampled, [-0.5, -0.5], order=0)
-            # and the last column and row need to be removed
-            image_oversampled = image_oversampled[:-1, :-1]
-        else:
-            image_oversampled = interpolation.shift(image_oversampled, [+0.5, +0.5], order=0)
-            # and the last column and row need to be removed
-            image_oversampled = image_oversampled[1:, 1:]
-    return image_oversampled
