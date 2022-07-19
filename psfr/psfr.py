@@ -278,7 +278,8 @@ def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
 
     # resize to pixel scale (making sure the grid definition with the center in the central pixel is preserved)
     if degrade is True:
-        psf_shifted = kernel_util.degrade_kernel(psf_shifted, degrading_factor=oversampling)
+        psf_shifted = oversampled2data(psf_shifted, oversampling=oversampling)
+        # psf_shifted = kernel_util.degrade_kernel(psf_shifted, degrading_factor=oversampling)
         psf_shifted = kernel_util.cut_psf(psf_shifted, n_pix_star)
     return psf_shifted
 

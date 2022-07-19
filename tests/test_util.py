@@ -14,15 +14,15 @@ def test_regular2oversampled():
     flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
     image = lenstronomy_util.array2image(flux_true)
 
-    oversampling_list = [1, 2, 3, 4]
+    oversampling_list = [1, 2, 3, 4, 5, 6, 7, 8, 9]
     for oversampling in oversampling_list:
         image_oversampled = util.regular2oversampled(image, oversampling=oversampling)
-        # check length
-        print(oversampling, 'test')
+        # check that surface brightness is conserved
         npt.assert_almost_equal(np.sum(image_oversampled), np.sum(image) * oversampling**2, decimal=5)
         n_pix = numpix * oversampling
         if n_pix % 2 == 0:
             n_pix -= 1
+        # check length
         assert np.shape(image_oversampled) == (n_pix, n_pix)
 
 
