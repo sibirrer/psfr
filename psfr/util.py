@@ -1,12 +1,12 @@
 import scipy.ndimage.interpolation as interpolation
-from lenstronomy.Util import kernel_util
+from lenstronomy.Util import kernel_util, image_util
 
 
 def regular2oversampled(image, oversampling=1):
     """
     makes each pixel n x n pixels (with n=oversampling), makes it such that center remains in center pixel
     No sharpening below the original pixel scale is performed. This function should behave as the inverse of
-    oversampled2regular().
+    oversampled2regular(). This function is flux conserving
 
     Parameters
     ----------
@@ -37,7 +37,7 @@ def regular2oversampled(image, oversampling=1):
         # and the last column and row need to be removed
         image_oversampled2 = image_oversampled2[1:, 1:]
         image_oversampled = (image_oversampled1 + image_oversampled2) / 2
-    return image_oversampled
+    return image_oversampled / oversampling ** 2
 
 
 def oversampled2data(image_oversampled, oversampling=1):
@@ -65,7 +65,5 @@ def oversampled2data(image_oversampled, oversampling=1):
     # TODO: this should be in a single function and not compensating for kernel_util.degrade_kernel()
     if n % oversampling == 0:
         n_pix = int(n / oversampling)
-        image_degraded = kernel_util.cut_psf(image_degraded, n_pix)
-    if oversampling % 2 == 0:
-        image_degraded /= oversampling ** 2
+        image_degraded = image_util.cut_edges(image_degraded, n_pix)
     return image_degraded

@@ -138,20 +138,16 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             plt.show()
 
         # shift PSF to position pre-determined to be the center of the point source, and degrate it to the image
-        if oversampling > 1:
-            psf_shifted = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=False, n_pix_star=len(star))
-            if verbose:
-                plt.imshow(np.log10(psf_shifted), origin='lower', vmin=-5, vmax=-1)
-                plt.title('psf shifted')
-                plt.show()
-            # make data degraded version
-            psf_shifted_data = kernel_util.degrade_kernel(psf_shifted, degrading_factor=oversampling)
-            # make sure size is the same as the data
-            psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
-        else:
-            psf_shifted_data = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=True,
-                                         n_pix_star=len(star))
-            psf_shifted = psf_shifted_data
+        psf_shifted = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=False, n_pix_star=len(star))
+        if verbose:
+            plt.imshow(np.log10(psf_shifted), origin='lower', vmin=-5, vmax=-1)
+            plt.title('psf shifted')
+            plt.show()
+        # make data degraded version
+        psf_shifted_data = oversampled2data(psf_shifted, oversampling=oversampling)
+        # psf_shifted_data = kernel_util.degrade_kernel(psf_shifted, degrading_factor=oversampling)
+        # make sure size is the same as the data
+        psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
 
         if verbose:
             plt.imshow(np.log10(psf_shifted_data), origin='lower', vmin=-5, vmax=-1)
@@ -164,9 +160,12 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         if oversampled_residual_deshifting:  # directly in oversampled space
             star_super = regular2oversampled(star, oversampling=oversampling)  # TODO: needs only be calculated once!
             mask_super = regular2oversampled(mask_list[i], oversampling=oversampling)
-            mask_super[mask_super < 1] = 0
-            mask_super[mask_super >= 1] = 1
+            # attention the routine is flux conserving and need to be changed for the mask,
+            # in case of interpolation we block everything that has a tenth of a mask in there
+            mask_super[mask_super < 1./oversampling**2 / 10] = 0
+            mask_super[mask_super >= 1./oversampling**2 / 10] = 1
             residuals_oversampled = (star_super - amp * psf_shifted) * mask_super
+            residuals_oversampled /= amp
 
             # shift residuals back on higher res grid
             # inverse shift residuals
@@ -182,14 +181,13 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
                 plt.title('residuals')
                 plt.show()
 
-            if verbose:
                 plt.imshow(residuals, origin='lower')
                 plt.title('residuals')
                 plt.show()
             # re-normalize residuals
             residuals /= amp  # devide by amplitude of point source
             # high-res version of residuals
-            residuals_oversampled = residuals.repeat(oversampling, axis=0).repeat(oversampling, axis=1)
+            residuals_oversampled = residuals.repeat(oversampling, axis=0).repeat(oversampling, axis=1) / oversampling ** 2
             if verbose:
                 plt.imshow(residuals_oversampled, origin='lower')
                 plt.title('residuals oversampled')

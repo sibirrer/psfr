@@ -18,12 +18,29 @@ def test_regular2oversampled():
     for oversampling in oversampling_list:
         image_oversampled = util.regular2oversampled(image, oversampling=oversampling)
         # check that surface brightness is conserved
-        npt.assert_almost_equal(np.sum(image_oversampled), np.sum(image) * oversampling**2, decimal=5)
+        npt.assert_almost_equal(np.sum(image_oversampled), np.sum(image), decimal=5)
         n_pix = numpix * oversampling
         if n_pix % 2 == 0:
             n_pix -= 1
         # check length
         assert np.shape(image_oversampled) == (n_pix, n_pix)
+
+
+def test_oversampled2data():
+    x_grid, y_gird = lenstronomy_util.make_grid(19 * 5, 1., 1)
+    sigma = 1.5
+    amp = 2
+    from lenstronomy.LightModel.Profiles.gaussian import Gaussian
+    gaussian = Gaussian()
+    flux = gaussian.function(x_grid, y_gird, amp=2, sigma=sigma)
+    image_oversampled = lenstronomy_util.array2image(flux) / np.sum(flux) * amp
+
+    for degrading_factor in range(7):
+        oversampling = degrading_factor + 1
+        kernel_degraded = util.oversampled2data(image_oversampled, oversampling=oversampling)
+        # kernel_degraded = kernel_util.degrade_kernel(kernel_super, degrading_factor=degrading_factor + 1)
+        print(oversampling)
+        npt.assert_almost_equal(np.sum(kernel_degraded), amp, decimal=8)
 
 
 def test_regular2oversampled_inverse():
