@@ -6,7 +6,7 @@ def regular2oversampled(image, oversampling=1):
     """
     makes each pixel n x n pixels (with n=oversampling), makes it such that center remains in center pixel
     No sharpening below the original pixel scale is performed. This function should behave as the inverse of
-    oversampled2regular(). This function is flux conserving
+    oversampled2regular(). This function is flux conserving.
 
     Parameters
     ----------
@@ -40,7 +40,7 @@ def regular2oversampled(image, oversampling=1):
     return image_oversampled / oversampling ** 2
 
 
-def oversampled2data(image_oversampled, oversampling=1):
+def oversampled2regular(image_oversampled, oversampling=1):
     """
     Averages the pixel flux such that s x s oversampled pixels result in one pixel, with s = oversampling.
     The routine is designed to keep the centroid in the very centered pixel.

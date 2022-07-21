@@ -37,7 +37,7 @@ def test_oversampled2data():
 
     for degrading_factor in range(7):
         oversampling = degrading_factor + 1
-        kernel_degraded = util.oversampled2data(image_oversampled, oversampling=oversampling)
+        kernel_degraded = util.oversampled2regular(image_oversampled, oversampling=oversampling)
         # kernel_degraded = kernel_util.degrade_kernel(kernel_super, degrading_factor=degrading_factor + 1)
         print(oversampling)
         npt.assert_almost_equal(np.sum(kernel_degraded), amp, decimal=8)
@@ -57,7 +57,7 @@ def test_regular2oversampled_inverse():
     for oversampling in oversampling_list:
         image_oversampled = util.regular2oversampled(image, oversampling=oversampling)
         # degrade and compare with image
-        image_degraded = util.oversampled2data(image_oversampled, oversampling)
+        image_degraded = util.oversampled2regular(image_oversampled, oversampling)
         assert np.shape(image_degraded) == np.shape(image)
 
         if False:
