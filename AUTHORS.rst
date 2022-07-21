@@ -10,4 +10,6 @@ Development Lead
 Contributors
 ------------
 
-None yet. Why not be the first?
+* Vikram Bhamre `vikramb1 <https://github.com/vikramb1/>`_
+* Lilan Yang `ylilan <https://github.com/ylilan/>`_
+

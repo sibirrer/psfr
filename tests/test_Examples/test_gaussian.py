@@ -67,7 +67,7 @@ def test_gaussian():
     deshift_order_list = [1]  # [0, 1, 2, 3]
     oversampled_residual_deshifting_list = [False]  # [True, False]
     oversampling_list = [1, 2, 3, 4, 5]
-    step_factor_list = [0.2] # [0.2, 0.5, 1]
+    step_factor_list = [0.2]  # [0.2, 0.5, 1]
 
     for step_factor in step_factor_list:
         for oversampled_residual_deshifting in oversampled_residual_deshifting_list:
