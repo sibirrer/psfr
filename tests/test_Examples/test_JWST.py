@@ -3,12 +3,13 @@ import numpy.testing as npt
 import os
 import astropy.io.fits as pyfits
 import numpy as np
-import matplotlib.pyplot as plt
+
 
 def test_retrieve_psf():
     module_path = os.path.dirname(psfr.__file__)
     psf_filename = module_path + '/Data/JWST_mock/psf_f090w_supersample5_crop.fits'
     npt.assert_equal(os.path.isfile(psf_filename),True, err_msg = 'Psf file not found')
+
 
 def test_reconstruct_psf():
     import lenstronomy.Util.kernel_util as util
@@ -18,6 +19,7 @@ def test_reconstruct_psf():
 
     oversampling = 5
     star_list_webb = []
+    np.random.seed(42)
     for i in range(5):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling)
