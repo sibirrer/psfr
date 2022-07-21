@@ -4,91 +4,83 @@ import scipy.optimize
 from scipy.ndimage import interpolation
 import matplotlib.pylab as plt
 from lenstronomy.Util import util, kernel_util, image_util
+from psfr.util import regular2oversampled, oversampled2regular
+from psfr import mask_util
+
 
 # TODO: change this dependency
 from lenstronomy.Workflow.psf_fitting import PsfFitting
 combine_psf = PsfFitting.combine_psf
 
 
-def stack_psf(star_list, oversampling=1, saturation_limit=None, num_iteration=5, n_recenter=10,
-              verbose=False, mask_list=None, kwargs_one_step={}, **kwargs):
+def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
+              verbose=False, kwargs_one_step=None):
     """
     Parameters
     ----------
-    star_list: list of numpy arrays (2D) of stars.
-     Odd square axes with the approximate star within the center pixel. All stars need the same cutout size.
-    oversampling: integer, higher-resolution PSF reconstruction and return
-    saturation_limit: float or list of floats for each star;
-     pixel values abouve this threshold will not be considered in the reconstruction.
+    star_list: list of numpy arrays (2D) of stars. Odd square axis shape.
+        Cutout stars from images with approximately centered on the center pixel. All stars need the same cutout size.
+    oversampling : integer >=1
+        higher-resolution PSF reconstruction and return
+    mask_list : list of 2d boolean or integer arrays, same shape as star_list
+        list of masks for each individual star's pixel to be included in the fit or not.
+        0 means excluded, 1 means included
+    saturation_limit: float or list of floats of length of star_list
+        pixel values above this threshold will not be considered in the reconstruction.
+    num_iteration : integer >= 1
+        number of iterative corrections applied on the PSF based on previous guess
     n_recenter: integer
         Every n_recenter iterations of the updated PSF, a re-centering of the centroids are performed with the updated
         PSF guess.
+    verbose : boolean
+        If True, provides plots of updated PSF during the iterative process
+    kwargs_one_step : keyword arguments to be passed to one_step_psf_estimate() method
+        See one_step_psf_estimate() method for options
+
+    Returns
+    -------
+    psf_guess : 2d numpy array with square odd axis
+        best guess PSF in the oversampled resolution
+    mask_list : list of 2d boolean or integer arrays, same shape as star_list
+        list of masks for each individual star's pixel to be included in the fit or not.
+        0 means excluded, 1 means included.
+        This list is updated with all the criteria applied on the fitting and might deviate from the input mask_list.
+    center_list : list of 2d floats
+        list of astrometric centers relative to the center pixel of the individual stars
+
     """
+    # update the mask according to settings
+    mask_list = mask_util.mask_configuration(star_list, mask_list=mask_list, saturation_limit=saturation_limit)
+    if kwargs_one_step is None:
+        kwargs_one_step = {}
 
-    n_star = len(star_list)
-    # define saturation masks
-    if saturation_limit is not None:
-        n_sat = len(np.atleast_1d(saturation_limit))
-        if n_sat == 1:
-            saturation_limit = [saturation_limit] * n_star
-        else:
-            if n_sat != n_star:
-                raise ValueError('saturation_limit is a list with nonequal length to star_list.')
-    # initiate a mask_list that accepts all pixels
-    if mask_list is None:
-        mask_list = []
-        for i, star in enumerate(star_list):
-            mask = np.ones_like(star)
-            mask_list.append(mask)
-    # add threshold for saturation in mask
-    if saturation_limit is not None:
-        for i, mask in enumerate(mask_list):
-            mask[star_list[i] > saturation_limit[i]] = 0
-
-            # define base stacking without shift
-    # integer shift
+    # define base stacking without shift offset shifts
     # stacking with mask weight
-    star_stack_base = np.zeros_like(star_list[0])
-    weight_map = np.zeros_like(star_list[0])
-    for i, star in enumerate(star_list):
-        star_stack_base += star * mask_list[i]
-        weight_map += mask_list[i] * np.sum(star)
-    star_stack_base = star_stack_base / weight_map
+    star_stack_base = base_stacking(star_list, mask_list)
     star_stack_base /= np.sum(star_stack_base)
 
-    # estimate center offsets based on base stacking
+    # estimate center offsets based on base stacking PSF estimate
     center_list = []
     for i, star in enumerate(star_list):
         x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i])
         center_list.append([x_c, y_c])
+
+    # re-size initial guess to oversampled resolution
+    psf_guess = regular2oversampled(star_stack_base, oversampling=oversampling)
+
     if verbose:
-        print(center_list, 'center_list')
+        f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
+
+        ax = axes[0]
+        ax.imshow(np.log10(star_stack_base), origin='lower')
+        ax.set_title('star_stack_base')
+        plt.show()
+        ax = axes[1]
+        ax.imshow(np.log10(psf_guess), origin='lower')
+        ax.set_title('input first guess')
+        plt.show()
 
     # simultaneous iterative correction of PSF starting with base stacking in oversampled resolution
-    psf_guess = star_stack_base.repeat(oversampling, axis=0).repeat(oversampling, axis=1)
-    if oversampling % 2 == 1:
-        pass
-    else:
-        # for even number super-sampling half a super-sampled pixel offset needs to be performed
-        psf_guess1 = interpolation.shift(psf_guess, [- 0.5, - 0.5], order=1)
-        # and the last column and row need to be removed
-        psf_guess1 = psf_guess1[:-1, :-1]
-
-        psf_guess2 = interpolation.shift(psf_guess, [+0.5, +0.5], order=1)
-        # and the last column and row need to be removed
-        psf_guess2 = psf_guess2[1:, 1:]
-        psf_guess = (psf_guess1 + psf_guess2) / 2
-
-    # psf_guess = kernel_util.subgrid_kernel(star_stack_base, oversampling, odd=True, num_iter=0)
-    if verbose:
-        plt.imshow(np.log10(star_stack_base), origin='lower')
-        plt.title('star_stack_base')
-        plt.show()
-
-        plt.imshow(np.log10(psf_guess), origin='lower')
-        plt.title('input first guess')
-        plt.show()
-
     for j in range(num_iteration):
         psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list,
                                           oversampling=oversampling, **kwargs_one_step)
@@ -98,16 +90,46 @@ def stack_psf(star_list, oversampling=1, saturation_limit=None, num_iteration=5,
                 x_c, y_c = centroid_fit(star, psf_guess, mask_list[i], oversampling=oversampling)
                 center_list.append([x_c, y_c])
         if verbose:
+            # TODO: make a movie out of this
             plt.imshow(np.log(psf_guess), vmin=-5, vmax=-1)
             plt.title('iteration %s' % j)
+            plt.colorbar()
             plt.show()
     return psf_guess, center_list, mask_list
 
 
-def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=None, step_factor=0.2,
-                          oversampling=1, verbose=False):
+def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=None, oversampling=1,
+                          step_factor=0.2, oversampled_residual_deshifting=False, deshift_order=1, verbose=False):
     """
 
+    Parameters
+    ----------
+    star_list: list of numpy arrays (2D) of stars. Odd square axis shape.
+        Cutout stars from images with approximately centered on the center pixel. All stars need the same cutout size.
+    psf_guess : 2d numpy array with square odd axis
+        best guess PSF in the oversampled resolution prior to this iteration step
+    center_list : list of 2d floats
+        list of astrometric centers relative to the center pixel of the individual stars
+    mask_list : list of 2d boolean or integer arrays, same shape as star_list
+        list of masks for each individual star's pixel to be included in the fit or not.
+        0 means excluded, 1 means included
+    oversampling : integer >=1
+        higher-resolution PSF reconstruction and return
+    error_map_list : None, or list of 2d numpy array, same size as data
+        Variance in the uncorrelated uncertainties in the data for individual pixels.
+        If not set, assumes equal variances for all pixels.
+    oversampled_residual_deshifting : boolean
+        if True; produces first an oversampled residual map and then de-shifts it back to the center for each star
+        if False; produces a residual map in the data space and de-shifts it into a higher resolution residual map for
+        stacking
+    deshift_order : integer >= 0
+        polynomial order of interpolation of the de-shifting of the residuals to the center to be interpreted as
+        desired corrections for a given star
+    step_factor : float or integer in (0, 1]
+        weight of updated estimate based on new and old estimate;
+        psf_update = step_factor * psf_new + (1 - step_factor) * psf_old
+    verbose : boolean
+        If True, provides plots of intermediate products walking through one iteration process for each individual star
     """
     if mask_list is None:
         mask_list = []
@@ -120,123 +142,71 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         center = center_list[i]
         # shift PSF guess to estimated position of star
 
-        # x_int = int(round(center[0]))
-        # y_int = int(round(center[1]))
-        # x_int, y_int = 0, 0
-
-        if verbose:
-            plt.imshow(np.log10(star), origin='lower', vmin=-5, vmax=-1)
-            plt.title('star 1')
-            plt.show()
-        if verbose:
-            plt.imshow(np.log10(psf_guess), origin='lower', vmin=-5, vmax=-1)
-            plt.title('psf guess')
-            plt.show()
-
         # shift PSF to position pre-determined to be the center of the point source, and degrate it to the image
-        if oversampling > 1:
-            psf_shifted = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=False, n_pix_star=len(star))
-            if verbose:
-                plt.imshow(np.log10(psf_shifted), origin='lower', vmin=-5, vmax=-1)
-                plt.title('psf shifted')
-                plt.show()
-            # make data degraded version
-            psf_shifted_data = kernel_util.degrade_kernel(psf_shifted, degrading_factor=oversampling)
-            # make sure size is the same as the data
-            psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
-        else:
-            psf_shifted_data = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=True,
-                                         n_pix_star=len(star))
-            psf_shifted = psf_shifted_data
+        psf_shifted = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=False, n_pix_star=len(star))
 
-        if verbose:
-            plt.imshow(np.log10(psf_shifted_data), origin='lower', vmin=-5, vmax=-1)
-            plt.title('psf shifted data')
-            plt.show()
+        # make data degraded version
+        psf_shifted_data = oversampled2regular(psf_shifted, oversampling=oversampling)
+        # make sure size is the same as the data and normalized to sum = 1
+        psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
         # linear inversion in 1d
-
         amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list[i])
 
-        # TODO make residual map on higher resolution space
         # compute residuals on data
-        if False:  # directly in oversampled space
-            star_super = _image2oversampled(star, oversampling=oversampling)  # TODO: needs only be calculated once!
-            mask_super = _image2oversampled(mask_list[i], oversampling=oversampling)
-            mask_super[mask_super < 1] = 0
-            mask_super[mask_super >= 1] = 1
-            residuals_oversampled = (star_super - amp * psf_shifted) * mask_super
+        if oversampled_residual_deshifting:  # directly in oversampled space
+            star_super = regular2oversampled(star, oversampling=oversampling)  # TODO: needs only be calculated once!
+            mask_super = regular2oversampled(mask_list[i], oversampling=oversampling)
+            # attention the routine is flux conserving and need to be changed for the mask,
+            # in case of interpolation we block everything that has a tenth of a mask in there
+            mask_super[mask_super < 1./oversampling**2 / 10] = 0
+            mask_super[mask_super >= 1./oversampling**2 / 10] = 1
+            residuals = (star_super - amp * psf_shifted) * mask_super
+            residuals /= amp
 
             # shift residuals back on higher res grid
             # inverse shift residuals
             shift_x = center[0] * oversampling
             shift_y = center[1] * oversampling
-
-            residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y, -shift_x], order=0)
+            residuals_shifted = interpolation.shift(residuals, [-shift_y, -shift_x], order=deshift_order)
 
         else:  # in data space and then being oversampled
             residuals = (star - amp * psf_shifted_data) * mask_list[i]
-
-            if verbose:
-                plt.imshow(star - amp * psf_shifted_data, origin='lower')
-                plt.title('residuals')
-                plt.show()
-
-            if verbose:
-                plt.imshow(residuals, origin='lower')
-                plt.title('residuals')
-                plt.show()
             # re-normalize residuals
-            residuals /= amp  # devide by amplitude of point source
+            residuals /= amp  # divide by amplitude of point source
             # high-res version of residuals
-            residuals_oversampled = residuals.repeat(oversampling, axis=0).repeat(oversampling, axis=1)
-            if verbose:
-                plt.imshow(residuals_oversampled, origin='lower')
-                plt.title('residuals oversampled')
-                plt.show()
+            residuals = residuals.repeat(oversampling, axis=0).repeat(oversampling, axis=1) / oversampling ** 2
             # shift residuals back on higher res grid
             # inverse shift residuals
             shift_x = center[0] * oversampling
             shift_y = center[1] * oversampling
-            # for odd number super-sampling
-            if oversampling % 2 == 1:
-                residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y, -shift_x], order=0)
 
-            else:
+            if oversampling % 2 == 1:  # for odd number super-sampling
+                residuals_shifted = interpolation.shift(residuals, [-shift_y, -shift_x], order=deshift_order)
+
+            else:  # for even number super-sampling
                 # for even number super-sampling half a super-sampled pixel offset needs to be performed
-                # TODO: move them in random direction in all four directions (not only two)
-                rand_num = np.random.randint(2)
-                if rand_num == 1:
-                    residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y - 0.5, -shift_x - 0.5],
-                                                            order=0)
-                    # and the last column and row need to be removed
-                    residuals_shifted = residuals_shifted[:-1, :-1]
-                else:
-                    residuals_shifted = interpolation.shift(residuals_oversampled, [-shift_y + 0.5, -shift_x + 0.5],
-                                                            order=0)
-                    # and the last column and row need to be removed
-                    residuals_shifted = residuals_shifted[1:, 1:]
+                # TODO: move them in all four directions (not only two)
+                residuals_shifted1 = interpolation.shift(residuals, [-shift_y - 0.5, -shift_x - 0.5],
+                                                         order=deshift_order)
+                # and the last column and row need to be removed
+                residuals_shifted1 = residuals_shifted1[:-1, :-1]
+
+                residuals_shifted2 = interpolation.shift(residuals, [-shift_y + 0.5, -shift_x + 0.5],
+                                                         order=deshift_order)
+                # and the last column and row need to be removed
+                residuals_shifted2 = residuals_shifted2[1:, 1:]
+                residuals_shifted = (residuals_shifted1 + residuals_shifted2) / 2
 
         # re-size shift residuals
         psf_size = len(psf_guess)
         residuals_shifted = image_util.cut_edges(residuals_shifted, psf_size)
-        if verbose:
-            plt.imshow(residuals_shifted, origin='lower')
-            plt.title('residuals shifted')
-            plt.show()
-
         # normalize residuals
         correction = residuals_shifted - np.mean(residuals_shifted)
-        if verbose:
-            plt.imshow(correction, origin='lower')
-            plt.title('correction')
-            plt.show()
         psf_new = psf_guess + correction
         psf_new[psf_new < 0] = 0
         psf_new /= np.sum(psf_new)
         if verbose:
-            plt.imshow(psf_new, origin='lower')
-            plt.title('psf_new')
-            plt.show()
+            _verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction, psf_new)
         psf_list_new.append(psf_new)
 
     # stack all residuals and update the psf guess
@@ -278,9 +248,38 @@ def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
 
     # resize to pixel scale (making sure the grid definition with the center in the central pixel is preserved)
     if degrade is True:
-        psf_shifted = kernel_util.degrade_kernel(psf_shifted, degrading_factor=oversampling)
-        psf_shifted = kernel_util.cut_psf(psf_shifted, n_pix_star)
+        psf_shifted = oversampled2regular(psf_shifted, oversampling=oversampling)
+        psf_shifted = image_util.cut_edges(psf_shifted, n_pix_star)
+        # psf_shifted = kernel_util.cut_psf(psf_shifted, n_pix_star)
     return psf_shifted
+
+
+def base_stacking(star_list, mask_list):
+    """
+    Basic stacking of stars in luminosity-weighted and mask-excluded regime.
+    The method ignores sub-pixel off-centering of individual stars nor does it provide an oversampled solution.
+    This method is intended as a baseline comparison and as an initial guess version for the full PSF-r features.
+
+    Parameters
+    ----------
+    star_list : list of 2d numpy arrays
+        list of cutout stars (to be included in the fitting)
+    mask_list : list of 2d boolean or integer arrays, same shape as star_list
+        list of masks for each individual star's pixel to be included in the fit or not.
+        0 means excluded, 1 means included
+
+    Returns
+    -------
+    star_stack_base : 2d numpy array of size of the stars in star_list
+        luminosity weighted and mask-excluded stacked stars
+    """
+    star_stack_base = np.zeros_like(star_list[0])
+    weight_map = np.zeros_like(star_list[0])
+    for i, star in enumerate(star_list):
+        star_stack_base += star * mask_list[i]
+        weight_map += mask_list[i] * np.sum(star)
+    star_stack_base = star_stack_base / weight_map
+    return star_stack_base
 
 
 def _linear_amplitude(data, model, variance=None, mask=None):
@@ -373,26 +372,67 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
     return x.x
 
 
-def _image2oversampled(image, oversampling=1):
+def _verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction, psf_new):
     """
-    makes each pixel n x n pixels (with n=oversampling), makes it such that center remains in center pixel
+    plotting of intermediate products happening during one step
     """
-    if oversampling == 1:
-        return image
-    image_oversampled = image.repeat(oversampling, axis=0).repeat(oversampling, axis=1)
-    if oversampling % 2 == 1:
-        pass  # this is already centered with odd total number of pixels
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+    f, axes = plt.subplots(1, 7, figsize=(4 * 7, 4))
+    vmin, vmax = -5, -1
 
-    else:
-        # for even number super-sampling half a super-sampled pixel offset needs to be performed
-        # we do the shift and cut in random directions such that it averages out
-        rand_num = np.random.randint(2)
-        if rand_num == 0:
-            image_oversampled = interpolation.shift(image_oversampled, [-0.5, -0.5], order=0)
-            # and the last column and row need to be removed
-            image_oversampled = image_oversampled[:-1, :-1]
-        else:
-            image_oversampled = interpolation.shift(image_oversampled, [+0.5, +0.5], order=0)
-            # and the last column and row need to be removed
-            image_oversampled = image_oversampled[1:, 1:]
-    return image_oversampled
+    ax = axes[0]
+    im = ax.imshow(np.log10(star / np.sum(star)), origin='lower', vmin=vmin, vmax=vmax)
+    # ax.autoscale(False)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('star normalized')
+
+    ax = axes[1]
+    im = ax.imshow(np.log10(psf_shifted), origin='lower', vmin=vmin, vmax=vmax)
+    # ax.autoscale(False)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('psf shifted (oversampled)')
+
+    ax = axes[2]
+    im = ax.imshow(np.log10(psf_shifted_data), origin='lower', vmin=vmin, vmax=vmax)
+    # ax.autoscale(False)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('psf shifted (regular)')
+
+    ax = axes[3]
+    im = ax.imshow(residuals, origin='lower')
+    # ax.autoscale(False)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('residuals on data')
+
+    ax = axes[4]
+    im = ax.imshow(residuals_shifted, origin='lower')
+    # ax.autoscale(False)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('residuals re-centered')
+
+    ax = axes[5]
+    im = ax.imshow(correction, origin='lower')
+    # ax.autoscale(False)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('corrections on previous PSF')
+
+    ax = axes[6]
+    im = ax.imshow(np.log10(psf_new), origin='lower', vmin=vmin, vmax=vmax)
+    # ax.autoscale(False)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    ax.set_title('new proposed PSF')
+    plt.show()
