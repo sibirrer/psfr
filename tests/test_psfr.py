@@ -9,6 +9,8 @@ import numpy as np
 from lenstronomy.Util import util
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import os
+import astropy.io.fits as pyfits
 
 
 def test_shift_psf():
@@ -172,3 +174,37 @@ def test_one_step_psf_estimation():
     diff_before = np.sum((psf_guess_super - psf_true_super) ** 2)
     assert diff_after < diff_before
 
+def test_saturation_limit():
+    import lenstronomy.Util.kernel_util as util
+    module_path = os.path.dirname(psfr.__file__)
+    psf_filename = module_path + '/Data/JWST_mock/psf_f090w_supersample5_crop.fits'
+    kernel = pyfits.getdata(psf_filename)
+
+    oversampling = 5
+    star_list_webb = []
+    x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
+    bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 4000
+    psf_guess = bright_star
+    brightnesses = abs(np.random.normal(loc=300, scale=100, size=(5,)))
+    star_list_webb.append(bright_star)
+    for i in range(5):
+        x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
+        star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
+        star_list_webb.append(star)
+
+    psf_psfr_super_sat, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
+                                                  saturation_limit=50, num_iteration=10, 
+                                                  n_recenter=20)
+    psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
+                                                  saturation_limit=30, num_iteration=10, 
+                                                  n_recenter=20)
+                                                
+    kernel_degraded = util.degrade_kernel(kernel, oversampling)
+    stacked_psf_sat_degraded = psfr.oversampled2regular(psf_psfr_super_sat, oversampling)
+    stacked_psf_degraded = psfr.oversampled2regular(psf_psfr_super, oversampling)
+    print(stacked_psf_sat_degraded)
+    print(stacked_psf_sat_degraded)
+
+    diff1 = np.sum((stacked_psf_sat_degraded - kernel_degraded)**2)
+    diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
+    npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with saturation limit is worse than default')
