@@ -182,19 +182,16 @@ def test_saturation_limit():
     kernel = pyfits.getdata(psf_filename)
 
     oversampling = 5
-    saturation_limit = 30
+    saturation_limit = 200
     star_list_webb = []
     x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
-    bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 8000
+    bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 4000
     psf_guess = bright_star
 
-    ignored_pixels = len(psf_guess[psf_guess >= saturation_limit])
-    npt.assert_array_less(10, ignored_pixels)
-
-    brightnesses = abs(np.random.normal(loc=300, scale=100, size=(10,)))
+    brightnesses = np.abs(np.random.normal(400,100,5))
+    brightnesses = [50, 20, 10, 30, 40]
     star_list_webb.append(bright_star)
-    star_list_webb.append(psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 10)
-    for i in range(10):
+    for i in range(5):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
         star_list_webb.append(star)
@@ -225,7 +222,7 @@ def test_noisy_psf():
     oversampling = 5
     star_list_webb_noisy = []
     star_list_webb = []
-    brightnesses = abs(np.random.normal(loc=1200, scale=400, size=(5,)))
+    brightnesses = abs(np.random.normal(loc=600, scale=200, size=(5,)))
     for i in range(5):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
