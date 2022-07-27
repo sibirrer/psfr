@@ -183,11 +183,11 @@ def test_saturation_limit():
     oversampling = 5
     star_list_webb = []
     x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
-    bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 4000
+    bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 8000
     psf_guess = bright_star
-    brightnesses = abs(np.random.normal(loc=300, scale=100, size=(5,)))
+    brightnesses = abs(np.random.normal(loc=300, scale=100, size=(10,)))
     star_list_webb.append(bright_star)
-    for i in range(5):
+    for i in range(10):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
         star_list_webb.append(star)
@@ -196,16 +196,15 @@ def test_saturation_limit():
                                                   saturation_limit=50, num_iteration=10, 
                                                   n_recenter=20)
     psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
-                                                  saturation_limit=30, num_iteration=10, 
+                                                  saturation_limit=None, num_iteration=10, 
                                                   n_recenter=20)
                                                 
     kernel_degraded = util.degrade_kernel(kernel, oversampling)
     stacked_psf_sat_degraded = psfr.oversampled2regular(psf_psfr_super_sat, oversampling)
-    stacked_psf_degraded = psfr.oversampled2regular(psf_psfr_super, oversampling)
 
     diff1 = np.sum((stacked_psf_sat_degraded - kernel_degraded)**2)
-    diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
-    npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with saturation limit is worse than default')
+    diff2 = np.sum((psf_guess - kernel_degraded)**2)
+    npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with saturation limit is worse than default')
 
 def test_noisy_psf():
     import lenstronomy.Util.kernel_util as util
@@ -235,4 +234,4 @@ def test_noisy_psf():
 
     diff1 = np.sum((stacked_psf_noisy_degraded - kernel_degraded)**2)
     diff2 = np.sum((psf_guess - kernel_degraded)**2)
-    npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with noisy psf is better than without noise')
+    npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with noisy psf is better than initial guess')
