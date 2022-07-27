@@ -167,7 +167,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             # inverse shift residuals
             shift_x = center[0] * oversampling
             shift_y = center[1] * oversampling
-            residuals_shifted = interpolation.shift(residuals, [-shift_y, -shift_x], order=deshift_order)
+            residuals_shifted = interpolation.shift(residuals, shift=[-shift_y, -shift_x], order=deshift_order)
 
         else:  # in data space and then being oversampled
             residuals = (star - amp * psf_shifted_data) * mask_list[i]
@@ -181,17 +181,17 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             shift_y = center[1] * oversampling
 
             if oversampling % 2 == 1:  # for odd number super-sampling
-                residuals_shifted = interpolation.shift(residuals, [-shift_y, -shift_x], order=deshift_order)
+                residuals_shifted = interpolation.shift(residuals, shift=[-shift_y, -shift_x], order=deshift_order)
 
             else:  # for even number super-sampling
                 # for even number super-sampling half a super-sampled pixel offset needs to be performed
                 # TODO: move them in all four directions (not only two)
-                residuals_shifted1 = interpolation.shift(residuals, [-shift_y - 0.5, -shift_x - 0.5],
+                residuals_shifted1 = interpolation.shift(residuals, shift=[-shift_y - 0.5, -shift_x - 0.5],
                                                          order=deshift_order)
                 # and the last column and row need to be removed
                 residuals_shifted1 = residuals_shifted1[:-1, :-1]
 
-                residuals_shifted2 = interpolation.shift(residuals, [-shift_y + 0.5, -shift_x + 0.5],
+                residuals_shifted2 = interpolation.shift(residuals, shift=[-shift_y + 0.5, -shift_x + 0.5],
                                                          order=deshift_order)
                 # and the last column and row need to be removed
                 residuals_shifted2 = residuals_shifted2[1:, 1:]
@@ -244,7 +244,7 @@ def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
     # shift psf
     # TODO: what is optimal interpolation in the shift, or doing it in Fourier space instead?
     # Partial answer: interpolation in order=1 is better than order=0 (order=2 is even better for Gaussian PSF's)
-    psf_shifted = interpolation.shift(psf_center, [shift_y, shift_x], order=2)
+    psf_shifted = interpolation.shift(psf_center, shift=[shift_y, shift_x], order=2)
 
     # resize to pixel scale (making sure the grid definition with the center in the central pixel is preserved)
     if degrade is True:
