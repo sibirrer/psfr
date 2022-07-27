@@ -29,11 +29,11 @@ def regular2oversampled(image, oversampling=1):
         # for even number super-sampling half a super-sampled pixel offset needs to be performed
         # we do the shift and cut in random directions such that it averages out
 
-        image_oversampled1 = interpolation.shift(image_oversampled, [-0.5, -0.5], order=1)
+        image_oversampled1 = interpolation.shift(image_oversampled, shift=[-0.5, -0.5], order=1)
         # and the last column and row need to be removed
         image_oversampled1 = image_oversampled1[:-1, :-1]
 
-        image_oversampled2 = interpolation.shift(image_oversampled, [+0.5, +0.5], order=1)
+        image_oversampled2 = interpolation.shift(image_oversampled, shift=[+0.5, +0.5], order=1)
         # and the last column and row need to be removed
         image_oversampled2 = image_oversampled2[1:, 1:]
         image_oversampled = (image_oversampled1 + image_oversampled2) / 2

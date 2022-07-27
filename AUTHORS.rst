@@ -5,7 +5,7 @@ Credits
 Development Lead
 ----------------
 
-* Simon Birrer <sibirrer@gmail.com>
+* Simon Birrer `sibirrer <https://github.com/sibirrer/>`_ <sibirrer@gmail.com>
 
 Contributors
 ------------
