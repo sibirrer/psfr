@@ -185,20 +185,24 @@ def test_saturation_limit():
     saturation_limit = 200
     star_list_webb = []
     x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
+    # very bright star added to list of stars
     bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 4000
     psf_guess = bright_star
 
-    brightnesses = np.abs(np.random.normal(400,100,5))
+    # 5 less bright stars are added
     brightnesses = [50, 20, 10, 30, 40]
     star_list_webb.append(bright_star)
     for i in range(5):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
+        # star generated and flux multiplied by relevant brightness factor
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
         star_list_webb.append(star)
 
+    # psf reconstructed with a saturation limit
     psf_psfr_super_sat, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
                                                   saturation_limit=saturation_limit, num_iteration=10, 
                                                   n_recenter=20)
+    # psf reconstructed without a saturation limit
     psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
                                                   saturation_limit=None, num_iteration=10, 
                                                   n_recenter=20)
@@ -209,6 +213,7 @@ def test_saturation_limit():
 
     diff1 = np.sum((stacked_psf_sat_degraded - kernel_degraded)**2)
     diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
+    # reconstructed psf with saturation limit should perform better than without
     npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with saturation limit is worse than without limit')
 
 def test_noisy_psf():
