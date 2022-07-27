@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 import astropy.io.fits as pyfits
-
+np.random.seed(42)
 
 def test_shift_psf():
     oversampling = 4
@@ -175,11 +175,11 @@ def test_one_step_psf_estimation():
     assert diff_after < diff_before
 
 def test_saturation_limit():
+    # check if psf with saturation limit is more accurate than one without
     import lenstronomy.Util.kernel_util as util
     module_path = os.path.dirname(psfr.__file__)
     psf_filename = module_path + '/Data/JWST_mock/psf_f090w_supersample5_crop.fits'
     kernel = pyfits.getdata(psf_filename)
-    np.random.seed(42)
 
     oversampling = 5
     saturation_limit = 30
@@ -212,12 +212,12 @@ def test_saturation_limit():
 
     diff1 = np.sum((stacked_psf_sat_degraded - kernel_degraded)**2)
     diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
-    npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with saturation limit is worse than default')
+    npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with saturation limit is worse than without limit')
 
 def test_noisy_psf():
+    # create 2 psfs with noisy and noiseless stars. checks if noisy psf has larger residual with the true psf
     import lenstronomy.Util.kernel_util as util
     import lenstronomy.Util.image_util as image_util
-    np.random.seed(42)
     module_path = os.path.dirname(psfr.__file__)
     psf_filename = module_path + '/Data/JWST_mock/psf_f090w_supersample5_crop.fits'
     kernel = pyfits.getdata(psf_filename)
@@ -225,13 +225,13 @@ def test_noisy_psf():
     oversampling = 5
     star_list_webb_noisy = []
     star_list_webb = []
-    brightnesses = abs(np.random.normal(loc=1200, scale=400, size=(10,)))
-    for i in range(10):
+    brightnesses = abs(np.random.normal(loc=1200, scale=400, size=(5,)))
+    for i in range(5):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
         star_list_webb.append(star)
         star_n1 = image_util.add_poisson(star, exp_time = 100.)
-        star_n2 = image_util.add_background(star, sigma_bkd = 0.05)
+        star_n2 = image_util.add_background(star, sigma_bkd = 0.5)
         star_noisy = star + star_n1 + star_n2
         star_list_webb_noisy.append(star_noisy)
 
@@ -248,4 +248,4 @@ def test_noisy_psf():
 
     diff1 = np.sum((stacked_psf_noisy_degraded - kernel_degraded)**2)
     diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
-    npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with noisy psf is better than initial guess')
+    npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with noisy stars is better than noiseless stars')
