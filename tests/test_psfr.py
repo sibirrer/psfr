@@ -182,17 +182,17 @@ def test_saturation_limit():
     kernel = pyfits.getdata(psf_filename)
 
     oversampling = 5
-    saturation_limit = 200
+    saturation_limit = 50
     star_list_webb = []
     x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
-    # very bright star added to list of stars
+    # very bright star added to list of stars and all flux values above saturation limit fixed
     bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 4000
-    psf_guess = bright_star
+    bright_star[bright_star > saturation_limit] = saturation_limit
 
     # 5 less bright stars are added
-    brightnesses = [50, 20, 10, 30, 40]
+    brightnesses = np.abs(np.random.normal(400 ,100 , 10))
     star_list_webb.append(bright_star)
-    for i in range(5):
+    for i in range(10):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
         # star generated and flux multiplied by relevant brightness factor
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
@@ -214,7 +214,7 @@ def test_saturation_limit():
     diff1 = np.sum((stacked_psf_sat_degraded - kernel_degraded)**2)
     diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
     # reconstructed psf with saturation limit should perform better than without
-    npt.assert_array_less(diff1, diff2, err_msg='reconstructed psf with saturation limit is worse than without limit')
+    npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with saturation limit is worse than without limit')
 
 def test_noisy_psf():
     # create 2 psfs with noisy and noiseless stars. checks if noisy psf has larger residual with the true psf
@@ -251,3 +251,4 @@ def test_noisy_psf():
     diff1 = np.sum((stacked_psf_noisy_degraded - kernel_degraded)**2)
     diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
     npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with noisy stars is better than noiseless stars')
+
