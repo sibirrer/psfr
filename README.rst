@@ -32,6 +32,15 @@ i.e., `Birrer et al. 2019 <https://ui.adsabs.harvard.edu/#abs/2018arXiv180901274
 `Shajib et al. 2019 <https://ui.adsabs.harvard.edu/abs/2019arXiv191006306S/abstract>`_ ,
 `Schmidt et al. 2022 <https://arxiv.org/abs/2206.04696>`_).
 
+Other resources
+---------------
+
+We also refer to the astropy core package
+`photutils <https://photutils.readthedocs.io/en/stable/index.html>`_
+and in particular to the empirical PSF module
+`ePSF <https://photutils.readthedocs.io/en/stable/epsf.html#build-epsf>`_ .
+
+
 Credits
 -------
 
