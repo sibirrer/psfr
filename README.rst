@@ -23,18 +23,20 @@ Features
 
 Used by
 -------
-It is in use with James Webb Space Telescope imaging data.
-The iterative PSF reconstruction procedure was also used for strongly lensed quasars,
+PSFr is in use with James Webb Space Telescope imaging data (`Santini et al. 2022  <https://ui.adsabs.harvard.edu/abs/2022arXiv220711379S/abstract>`_,
+`Merlin et al. 2022  <https://ui.adsabs.harvard.edu/abs/2022arXiv220711701M/abstract>`_,
+`Yang et al. 2022  <https://ui.adsabs.harvard.edu/abs/2022arXiv220713101Y/abstract>`_).
+The iterative PSF reconstruction procedure was originally developed and used for analyzing strongly lensed quasars (
 i.e., `Birrer et al. 2019 <https://ui.adsabs.harvard.edu/#abs/2018arXiv180901274B/abstract>`_
 , `Shajib et al. 2018 <https://ui.adsabs.harvard.edu/abs/2019MNRAS.483.5649S>`_ ,
-`Shajib et al. 2019 <https://ui.adsabs.harvard.edu/abs/2019arXiv191006306S/abstract>`_,
- `Schmidt et al. 2022 <https://arxiv.org/abs/2206.04696>`_.
+`Shajib et al. 2019 <https://ui.adsabs.harvard.edu/abs/2019arXiv191006306S/abstract>`_ ,
+`Schmidt et al. 2022 <https://arxiv.org/abs/2206.04696>`_).
 
 Credits
 -------
 
-The code is an off-spring of the iterative PSF reconstruction scheme of `lenstronomy <https://github.com/sibirrer/lenstronomy>`_
-, in particular the `psf_fitting.py <https://github.com/sibirrer/lenstronomy/lenstronomy/Workflow/psf_fitting.py>`_ functionalities.
+The software is an off-spring of the iterative PSF reconstruction scheme of `lenstronomy <https://github.com/sibirrer/lenstronomy>`_
+, in particular its `psf_fitting.py <https://github.com/sibirrer/lenstronomy/lenstronomy/Workflow/psf_fitting.py>`_ functionalities.
 
-If you make use of this code, please cite: 'This code is using PSFr (Birrer et al. in prep) utilizing features of
+If you make use of this software, please cite: 'This code is using PSFr (Birrer et al. in prep) utilizing features of
 lenstronomy (`Birrer et al. 2021 <https://joss.theoj.org/papers/10.21105/joss.03283>`_)'.
