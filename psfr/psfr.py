@@ -14,7 +14,7 @@ combine_psf = PsfFitting.combine_psf
 
 
 def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
-              verbose=False, kwargs_one_step=None):
+              verbose=False, kwargs_one_step=None, psf_initial_guess=None):
     """
     Parameters
     ----------
@@ -36,6 +36,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         If True, provides plots of updated PSF during the iterative process
     kwargs_one_step : keyword arguments to be passed to one_step_psf_estimate() method
         See one_step_psf_estimate() method for options
+    psf_initial_guess : None or 2d numpy array with square odd axis
+        Initial guess PSF on oversampled scale. If not provided, estimates an initial guess with the stacked stars.
 
     Returns
     -------
@@ -66,7 +68,10 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         center_list.append([x_c, y_c])
 
     # re-size initial guess to oversampled resolution
-    psf_guess = regular2oversampled(star_stack_base, oversampling=oversampling)
+    if psf_initial_guess is None:
+        psf_guess = regular2oversampled(star_stack_base, oversampling=oversampling)
+    else:
+        psf_guess = psf_initial_guess
 
     if verbose:
         f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
