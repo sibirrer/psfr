@@ -104,7 +104,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
 
 
 def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=None, oversampling=1,
-                          step_factor=0.2, oversampled_residual_deshifting=False, deshift_order=1, verbose=False):
+                          step_factor=0.2, oversampled_residual_deshifting=False, deshift_order=1, verbose=False,
+                          **kwargs_psf_stacking):
     """
 
     Parameters
@@ -133,6 +134,9 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     step_factor : float or integer in (0, 1]
         weight of updated estimate based on new and old estimate;
         psf_update = step_factor * psf_new + (1 - step_factor) * psf_old
+    kwargs_psf_stacking: keyword argument list of arguments going into combine_psf()
+        stacking_option : option of stacking, 'mean' or 'median'
+        symmetry: integer, imposed symmetry of PSF estimate
     verbose : boolean
         If True, provides plots of intermediate products walking through one iteration process for each individual star
     """
@@ -216,7 +220,8 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
 
     # stack all residuals and update the psf guess
     # TODO: make combine_psf remember the masks and relative brightness in the weighting scheme (for later)
-    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, stacking_option='mean', symmetry=1)
+    # factor = step_factor, stacking_option = 'mean', symmetry = 1
+    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, **kwargs_psf_stacking)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
 
