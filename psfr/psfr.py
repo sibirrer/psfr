@@ -15,7 +15,7 @@ combine_psf = PsfFitting.combine_psf
 
 
 def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
-              verbose=False, kwargs_one_step=None, psf_initial_guess=None, animate=False):
+              verbose=False, kwargs_one_step=None, psf_initial_guess=None, **kwargs_animate):
     """
     Parameters
     ----------
@@ -39,8 +39,9 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         See one_step_psf_estimate() method for options
     psf_initial_guess : None or 2d numpy array with square odd axis
         Initial guess PSF on oversampled scale. If not provided, estimates an initial guess with the stacked stars.
-    animate : boolean
-        If True, displays animation of interative process of psf reconstuction.
+    kwargs_animate : keyword arguments for animation settings
+        Settings to display animation of interative process of psf reconstuction. The argument is organized as:
+            {animate: bool, output_dir: str (directory to save animation in), duration: int (length of animation in milliseconds)}
 
     Returns
     -------
@@ -59,6 +60,10 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     if kwargs_one_step is None:
         kwargs_one_step = {}
 
+    # update default options
+    options = {'animate': False, 'output_dir': 'stacked_psf_animation.gif', 'duration': 5000}
+    options.update(kwargs_animate)
+
     # define base stacking without shift offset shifts
     # stacking with mask weight
     star_stack_base = base_stacking(star_list, mask_list)
@@ -75,7 +80,6 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         psf_guess = regular2oversampled(star_stack_base, oversampling=oversampling)
     else:
         psf_guess = psf_initial_guess
-
     if verbose:
         f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
 
@@ -89,7 +93,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         plt.show()
 
     # simultaneous iterative correction of PSF starting with base stacking in oversampled resolution
-    img_list = []
+    images_to_animate = []
     for j in range(num_iteration):
         psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list,
                                           oversampling=oversampling, **kwargs_one_step)
@@ -98,8 +102,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
             for i, star in enumerate(star_list):
                 x_c, y_c = centroid_fit(star, psf_guess, mask_list[i], oversampling=oversampling)
                 center_list.append([x_c, y_c])
-        if animate:
-            img_list.append(psf_guess)
+        if options['animate']:
+            images_to_animate.append(psf_guess)
         if verbose:
             # TODO: make a movie out of this
             plt.imshow(np.log(psf_guess), vmin=-5, vmax=-1)
@@ -107,21 +111,22 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
             plt.colorbar()
             plt.show()
 
-    def updatefig(i):
-        img.set_data(np.log10(img_list[i]))
+    # function that is called to update the image for the animation
+    def __updatefig(i):
+        img.set_data(np.log10(images_to_animate[i]))
         return [img]
 
-    if animate:
+    if options['animate']:
         global anim
         fig = plt.figure()
-        img = plt.imshow(np.log10(img_list[0]))
+        img = plt.imshow(np.log10(images_to_animate[0]))
         cmap = plt.get_cmap('viridis')
         cmap.set_bad(color = 'k', alpha = 1.)
         cmap.set_under('k')
         # animate and display iterative psf reconstuction
-        anim = animation.FuncAnimation(fig, updatefig, frames=len(img_list), 
-                              interval=int(5000/len(img_list)), blit=True)
-        anim.save('stacked_psf_animation.gif')
+        anim = animation.FuncAnimation(fig, __updatefig, frames=len(images_to_animate), 
+                              interval=int(options['duration']/len(images_to_animate)), blit=True)
+        anim.save(options['output_dir'])
         plt.close()
 
     return psf_guess, center_list, mask_list
