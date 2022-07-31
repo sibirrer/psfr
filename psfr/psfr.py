@@ -112,7 +112,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
             plt.show()
 
     # function that is called to update the image for the animation
-    def __updatefig(i):
+    def _updatefig(i):
         img.set_data(np.log10(images_to_animate[i]))
         return [img]
 
@@ -124,7 +124,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         cmap.set_bad(color = 'k', alpha = 1.)
         cmap.set_under('k')
         # animate and display iterative psf reconstuction
-        anim = animation.FuncAnimation(fig, __updatefig, frames=len(images_to_animate), 
+        anim = animation.FuncAnimation(fig, _updatefig, frames=len(images_to_animate), 
                               interval=int(options['duration']/len(images_to_animate)), blit=True)
         anim.save(options['output_dir'])
         plt.close()
