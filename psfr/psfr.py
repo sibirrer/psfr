@@ -15,7 +15,7 @@ combine_psf = PsfFitting.combine_psf
 
 
 def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
-              verbose=False, kwargs_one_step=None, psf_initial_guess=None, **kwargs_animate):
+              verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, **kwargs_animate):
     """
     Parameters
     ----------
@@ -41,7 +41,11 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         Initial guess PSF on oversampled scale. If not provided, estimates an initial guess with the stacked stars.
     kwargs_animate : keyword arguments for animation settings
         Settings to display animation of interative process of psf reconstuction. The argument is organized as:
-            {animate: bool, output_dir: str (directory to save animation in), duration: int (length of animation in milliseconds)}
+            {animate: bool, output_dir: str (directory to save animation in),
+            duration: int (length of animation in milliseconds)}
+    kwargs_psf_stacking: keyword argument list of arguments going into combine_psf()
+        stacking_option : option of stacking, 'mean' or 'median'
+        symmetry: integer, imposed symmetry of PSF estimate
 
     Returns
     -------
@@ -59,10 +63,12 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     mask_list = mask_util.mask_configuration(star_list, mask_list=mask_list, saturation_limit=saturation_limit)
     if kwargs_one_step is None:
         kwargs_one_step = {}
+    if kwargs_psf_stacking is None:
+        kwargs_psf_stacking = {}
 
-    # update default options
-    options = {'animate': False, 'output_dir': 'stacked_psf_animation.gif', 'duration': 5000}
-    options.update(kwargs_animate)
+    # update default options for animations
+    animation_options = {'animate': False, 'output_dir': 'stacked_psf_animation.gif', 'duration': 5000}
+    animation_options.update(kwargs_animate)
 
     # define base stacking without shift offset shifts
     # stacking with mask weight
@@ -102,7 +108,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
             for i, star in enumerate(star_list):
                 x_c, y_c = centroid_fit(star, psf_guess, mask_list[i], oversampling=oversampling)
                 center_list.append([x_c, y_c])
-        if options['animate']:
+        if animation_options['animate']:
             images_to_animate.append(psf_guess)
         if verbose:
             # TODO: make a movie out of this
@@ -116,7 +122,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         img.set_data(np.log10(images_to_animate[i]))
         return [img]
 
-    if options['animate']:
+    if animation_options['animate']:
         global anim
         fig = plt.figure()
         img = plt.imshow(np.log10(images_to_animate[0]))
@@ -125,8 +131,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         cmap.set_under('k')
         # animate and display iterative psf reconstuction
         anim = animation.FuncAnimation(fig, _updatefig, frames=len(images_to_animate), 
-                              interval=int(options['duration']/len(images_to_animate)), blit=True)
-        anim.save(options['output_dir'])
+                              interval=int(animation_options['duration']/len(images_to_animate)), blit=True)
+        anim.save(animation_options['output_dir'])
         plt.close()
 
     return psf_guess, center_list, mask_list
@@ -249,8 +255,9 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
 
     # stack all residuals and update the psf guess
     # TODO: make combine_psf remember the masks and relative brightness in the weighting scheme (for later)
-    # factor = step_factor, stacking_option = 'mean', symmetry = 1
-    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, **kwargs_psf_stacking)
+    psf_stacking_options = {'stacking_option': 'median', 'symmetry': 1}
+    psf_stacking_options.update(kwargs_psf_stacking)
+    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
 
