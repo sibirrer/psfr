@@ -457,7 +457,8 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     for i in range(symmetry):
         kernel_old_rotated[i, :, :] = kernel_old/np.sum(kernel_old)
 
-    # TODO add weight_list and mask_list
+    # TODO: add weight_list and mask_list
+    # TODO: outlier detection?
     kernel_list_new_extended = np.append(kernel_list, kernel_old_rotated, axis=0)
     if stacking_option == 'median':
         kernel_new = np.median(kernel_list_new_extended, axis=0)
