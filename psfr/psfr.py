@@ -461,9 +461,9 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     # TODO: outlier detection?
     kernel_list_new_extended = np.append(kernel_list, kernel_old_rotated, axis=0)
     if weight_list != None:
-        weights = weight_list.copy()
+        weights = np.append(weight_list, np.sum(kernel_old_rotated))
     else:
-        weights = [np.sum(i) for i in kernel_list_new_extended]
+        weights = [np.sum(l) for l in kernel_list_new_extended]
     if stacking_option == 'median':
         # adapted from this thread: https://stackoverflow.com/questions/26102867/python-weighted-median-algorithm-with-pandas
         flattened_psfs = np.array([y.flatten() for y in kernel_list_new_extended])
@@ -479,6 +479,8 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         kernel_new = np.array(new_img).reshape(x_dim, y_dim)
     elif stacking_option == 'mean':
         kernel_new = np.mean(kernel_list_new_extended, weights = weights, axis=0)
+    elif stacking_option == 'median_d':
+        kernel_new = np.median(kernel_list_new_extended, axis = 0)
     else:
         raise ValueError(" stack_option must be 'median' or 'mean', %s is not supported." % stacking_option)
     kernel_new = np.nan_to_num(kernel_new)
