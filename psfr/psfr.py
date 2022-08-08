@@ -9,11 +9,6 @@ from psfr.util import regular2oversampled, oversampled2regular
 from psfr import mask_util
 
 
-# TODO: change this dependency
-from lenstronomy.Workflow.psf_fitting import PsfFitting
-combine_psf = PsfFitting.combine_psf
-
-
 def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
               verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, **kwargs_animate):
     """
@@ -182,6 +177,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     if error_map_list is None:
         error_map_list = [None] * len(star_list)
     psf_list_new = []
+    weight_list = []
     for i, star in enumerate(star_list):
         center = center_list[i]
         # shift PSF guess to estimated position of star
@@ -195,6 +191,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
         # linear inversion in 1d
         amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list[i])
+        weight_list.append(amp)
 
         # compute residuals on data
         if oversampled_residual_deshifting:  # directly in oversampled space
@@ -257,7 +254,8 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     # TODO: make combine_psf remember the masks and relative brightness in the weighting scheme (for later)
     psf_stacking_options = {'stacking_option': 'median', 'symmetry': 1}
     psf_stacking_options.update(kwargs_psf_stacking)
-    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, **psf_stacking_options)
+    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list, weight_list=weight_list,
+                             **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
 
@@ -416,6 +414,62 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
     x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
                                 bounds=((-5, 5), (-5, 5)), method='Nelder-Mead')
     return x.x
+
+
+def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, factor=1., stacking_option='median',
+                symmetry=1):
+    """
+    updates psf estimate based on old kernel and several new estimates
+
+    Parameters
+    ----------
+    kernel_list_new : list of new PSF kernels estimated from the point sources in the image (un-normalized)
+    kernel_old : old PSF kernel
+    mask_list : None or list of booleans of shape of kernel_list_new
+        masks used in the kernel_list_new determination. These regions will not be considered in the combined PSF
+    weight_list : None or list of floats
+        weights of the different new kernel estimates (i.e. brightness of the stars, etc)
+    factor : weight of updated estimate based on new and old estimate, factor=1 means new estimate,
+        factor=0 means old estimate
+    stacking_option : string
+        option of stacking, mean or median
+    symmetry: integer >= 1
+        imposed symmetry of PSF estimate
+
+    Returns
+    -------
+    kernel_return : updated PSF estimate and error_map associated with it
+    """
+
+    n = int(len(kernel_list_new) * symmetry)
+    angle = 360. / symmetry
+    kernelsize = len(kernel_old)
+    kernel_list = np.zeros((n, kernelsize, kernelsize))
+    i = 0
+    for kernel_new in kernel_list_new:
+        for k in range(symmetry):
+            kernel_rotated = image_util.rotateImage(kernel_new, angle * k)
+            kernel_norm = kernel_util.kernel_norm(kernel_rotated)
+            kernel_list[i, :, :] = kernel_norm
+            i += 1
+
+    kernel_old_rotated = np.zeros((symmetry, kernelsize, kernelsize))
+    for i in range(symmetry):
+        kernel_old_rotated[i, :, :] = kernel_old/np.sum(kernel_old)
+
+    # TODO add weight_list and mask_list
+    kernel_list_new_extended = np.append(kernel_list, kernel_old_rotated, axis=0)
+    if stacking_option == 'median':
+        kernel_new = np.median(kernel_list_new_extended, axis=0)
+    elif stacking_option == 'mean':
+        kernel_new = np.mean(kernel_list_new_extended, axis=0)
+    else:
+        raise ValueError(" stack_option must be 'median' or 'mean', %s is not supported." % stacking_option)
+    kernel_new = np.nan_to_num(kernel_new)
+    kernel_new[kernel_new < 0] = 0
+    kernel_new = kernel_util.kernel_norm(kernel_new)
+    kernel_return = factor * kernel_new + (1.-factor) * kernel_old
+    return kernel_return
 
 
 def _verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction, psf_new):
