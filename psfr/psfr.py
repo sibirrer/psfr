@@ -460,10 +460,12 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     # TODO: add weight_list and mask_list
     # TODO: outlier detection?
     kernel_list_new_extended = np.append(kernel_list, kernel_old_rotated, axis=0)
-    weights = weight_list.copy()
-    if weights == None:
+    if weight_list != None:
+        weights = weight_list.copy()
+    else:
         weights = [np.sum(i) for i in kernel_list_new_extended]
     if stacking_option == 'median':
+        # adapted from this thread: https://stackoverflow.com/questions/26102867/python-weighted-median-algorithm-with-pandas
         flattened_psfs = np.array([y.flatten() for y in kernel_list_new_extended])
         x_dim, y_dim = kernel_list_new_extended[0].shape
         new_img = []
