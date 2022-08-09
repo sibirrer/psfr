@@ -8,7 +8,6 @@ from lenstronomy.Util import util, kernel_util, image_util
 from psfr.util import regular2oversampled, oversampled2regular
 from psfr import mask_util
 
-
 def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
               verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, **kwargs_animate):
     """
@@ -64,7 +63,6 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     # update default options for animations
     animation_options = {'animate': False, 'output_dir': 'stacked_psf_animation.gif', 'duration': 5000}
     animation_options.update(kwargs_animate)
-
     # define base stacking without shift offset shifts
     # stacking with mask weight
     star_stack_base = base_stacking(star_list, mask_list)
@@ -97,7 +95,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     images_to_animate = []
     for j in range(num_iteration):
         psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list,
-                                          oversampling=oversampling, **kwargs_one_step)
+                                          oversampling=oversampling, **kwargs_psf_stacking, **kwargs_one_step)
         if j % n_recenter == 0 and j != 0:
             center_list = []
             for i, star in enumerate(star_list):
@@ -460,10 +458,29 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     # TODO: add weight_list and mask_list
     # TODO: outlier detection?
     kernel_list_new_extended = np.append(kernel_list, kernel_old_rotated, axis=0)
+
+    if weight_list != None:
+        weights = np.append(weight_list, np.sum(kernel_old_rotated))
+    else:
+        weights = [np.sum(l) for l in kernel_list_new_extended]
+        
     if stacking_option == 'median':
-        kernel_new = np.median(kernel_list_new_extended, axis=0)
+        # adapted from this thread: https://stackoverflow.com/questions/26102867/python-weighted-median-algorithm-with-pandas
+        flattened_psfs = np.array([y.flatten() for y in kernel_list_new_extended])
+        x_dim, y_dim = kernel_list_new_extended[0].shape
+        new_img = []
+        for i in range(x_dim * y_dim):
+            pixels = flattened_psfs[:, i]
+            cumsum = np.cumsum(weights)
+            cutoff = np.sum(weights) / 2.0
+            pixels = np.sort(pixels)
+            median = pixels[cumsum >= cutoff][0]
+            new_img.append(median)
+        kernel_new = np.array(new_img).reshape(x_dim, y_dim)
     elif stacking_option == 'mean':
-        kernel_new = np.mean(kernel_list_new_extended, axis=0)
+        kernel_new = np.average(kernel_list_new_extended, weights = weights, axis=0)
+    elif stacking_option == 'median_default':
+        kernel_new = np.median(kernel_list_new_extended, axis = 0)
     else:
         raise ValueError(" stack_option must be 'median' or 'mean', %s is not supported." % stacking_option)
     kernel_new = np.nan_to_num(kernel_new)
