@@ -5,7 +5,7 @@ PSFr - Point Spread Function reconstruction
 .. image:: https://github.com/sibirrer/psfr/workflows/Tests/badge.svg
     :target: https://github.com/sibirrer/psfr/actions
 
-.. image:: https://github.com/sibirrer/psfr/tree/main/psfr/Data/stacked_psf_animation.gif
+.. image:: https://github.com/sibirrer/psfr/blob/main/docs/_static/stacked_psf_animation.gif
 
 Point Spread Function reconstruction for astronomical
 ground- and space-based imaging data.
