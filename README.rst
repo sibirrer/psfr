@@ -29,9 +29,8 @@ Example
 
     # run PSF reconstruction (see documentation for further options)
     from psfr.psfr import stack_psf
-    psf_moswl, center_list, mask_list = stack_psf(star_list_jwst, oversampling=4,
+    psf_model, center_list, mask_list = stack_psf(star_list_jwst, oversampling=4,
                                                   saturation_limit=None, num_iteration=50)
-
 
 We further refer to the example Notebook_ and the Documentation_.
 
