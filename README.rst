@@ -2,6 +2,8 @@
 PSFr - Point Spread Function reconstruction
 ===========================================
 
+|PyPI|
+
 .. image:: https://github.com/sibirrer/psfr/workflows/Tests/badge.svg
     :target: https://github.com/sibirrer/psfr/actions
 
@@ -16,6 +18,9 @@ PSFr - Point Spread Function reconstruction
 
 Point Spread Function reconstruction for astronomical
 ground- and space-based imaging data.
+
+.. |PyPI| image:: https://img.shields.io/pypi/v/psfr?label=PyPI&logo=pypi
+    :target: https://pypi.python.org/pypi/psfr
 
 
 Example
