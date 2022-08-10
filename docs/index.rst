@@ -1,5 +1,5 @@
-Welcome to psfr's documentation!
-======================================
+.. include:: ../README.rst
+
 
 .. toctree::
    :maxdepth: 2

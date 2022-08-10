@@ -425,10 +425,12 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
 
     Parameters
     ----------
-    kernel_list_new : list of new PSF kernels estimated from the point sources in the image (un-normalized)
-    kernel_old : old PSF kernel
+    kernel_list_new : list of 2d numpy arrays
+        new PSF kernels estimated from the point sources in the image (un-normalized)
+    kernel_old : 2d numpy array of shape of the oversampled kernel
+        old PSF kernel
     mask_list : None or list of booleans of shape of kernel_list_new
-        masks used in the kernel_list_new determination. These regions will not be considered in the combined PSF
+        masks used in the 'kernel_list_new' determination. These regions will not be considered in the combined PSF.
     weight_list : None or list of floats with positive semi-definite values
         weights of the different new kernel estimates (i.e. brightness of the stars, etc)
     factor : weight of updated estimate based on new and old estimate, factor=1 means new estimate,
@@ -466,7 +468,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         for i in range(symmetry):
             kernel_old_rotated[i, :, :] = kernel_old/np.sum(kernel_old)
             kernel_list = np.append(kernel_list, kernel_old_rotated, axis=0)
-            weights.append(weights, 1)
+            weights = np.append(weights, 1)
 
     # TODO: add mask_list
     # TODO: outlier detection?

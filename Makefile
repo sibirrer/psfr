@@ -59,20 +59,20 @@ coverage: ## check code coverage quickly with the default Python
 	coverage run --source psfr -m pytest
 	coverage report -m
 	coverage html
-	$(BROWSER) htmlcov/index.html
+	BROWSER htmlcov/index.html
 
 docs: ## generate Sphinx HTML documentation, including API docs
 	rm -f docs/psfr.rst
 	rm -f docs/modules.rst
 	sphinx-apidoc -o docs/ psfr
-	$(MAKE) -C docs clean
-	$(MAKE) -C docs html
-	$(BROWSER) docs/_build/html/index.html
+	MAKE -C docs clean
+	MAKE -C docs html
+	BROWSER docs/_build/html/index.html
 
-servedocs: docs ## compile the docs watching for changes
-	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
 
-release: dist ## package and upload a release
+pypi-upload:
+	python setup.py sdist
+	twine upload --repository-url https://test.pypi.org/legacy/ dist/*
 	twine upload dist/*
 
 dist: clean ## builds source and wheel package
