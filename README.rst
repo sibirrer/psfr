@@ -14,7 +14,7 @@ ground- and space-based imaging data.
 Example
 -------
 
-.. code-block::
+.. code-block:: python
 
     # get cutout stars in the field of a JWST observation (example import)
     from psfr.util import jwst_example_stars
