@@ -5,6 +5,10 @@ PSFr - Point Spread Function reconstruction
 .. image:: https://github.com/sibirrer/psfr/workflows/Tests/badge.svg
     :target: https://github.com/sibirrer/psfr/actions
 
+.. image:: https://readthedocs.org/projects/psfr/badge/?version=latest
+        :target: http://psfr.readthedocs.io/en/latest/?badge=latest
+        :alt: Documentation Status
+
 .. image:: https://coveralls.io/repos/github/sibirrer/psfr/badge.svg?branch=main
     :target: https://coveralls.io/github/sibirrer/psfr?branch=main
 
@@ -32,7 +36,7 @@ Example
 We further refer to the example Notebook_ and the Documentation_.
 
 .. _Notebook: https://github.com/sibirrer/psfr/blob/main/notebooks/JWST_PSF_reconstruction.ipynb
-.. _Documentation: https://psfr.readthedocs.io/en/latest/installation.html
+.. _Documentation: https://psfr.readthedocs.io/en/latest/
 
 
 Features
