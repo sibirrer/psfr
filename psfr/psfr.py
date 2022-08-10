@@ -252,8 +252,12 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     # TODO: make combine_psf remember the masks and relative brightness in the weighting scheme (for later)
     psf_stacking_options = {'stacking_option': 'median', 'symmetry': 1}
     psf_stacking_options.update(kwargs_psf_stacking)
-    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list, weight_list=weight_list,
-                             **psf_stacking_options)
+    weight_list = np.array(weight_list)
+    weight_list[weight_list < 0] = 0
+    # the weights are supposed to be Poisson noise dominated, which scales as the square root of the brightness
+    weights_psf_combined = np.sqrt(weight_list)
+    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list,
+                             weight_list=weights_psf_combined, **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
 
@@ -415,7 +419,7 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
 
 
 def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, factor=1., stacking_option='median',
-                symmetry=1):
+                symmetry=1, combine_with_old=False):
     """
     updates psf estimate based on old kernel and several new estimates
 
@@ -425,7 +429,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     kernel_old : old PSF kernel
     mask_list : None or list of booleans of shape of kernel_list_new
         masks used in the kernel_list_new determination. These regions will not be considered in the combined PSF
-    weight_list : None or list of floats
+    weight_list : None or list of floats with positive semi-definite values
         weights of the different new kernel estimates (i.e. brightness of the stars, etc)
     factor : weight of updated estimate based on new and old estimate, factor=1 means new estimate,
         factor=0 means old estimate
@@ -433,6 +437,8 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         option of stacking, mean or median
     symmetry: integer >= 1
         imposed symmetry of PSF estimate
+    combine_with_old : boolean
+        if True, adds the previous PSF as one of the proposals for the new PSFs
 
     Returns
     -------
@@ -440,34 +446,35 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     """
 
     n = int(len(kernel_list_new) * symmetry)
+    if weight_list is None:
+        weight_list = np.ones(len(kernel_list_new))
     angle = 360. / symmetry
     kernelsize = len(kernel_old)
     kernel_list = np.zeros((n, kernelsize, kernelsize))
+    weights = np.zeros(n)
     i = 0
-    for kernel_new in kernel_list_new:
+    for j, kernel_new in enumerate(kernel_list_new):
         for k in range(symmetry):
             kernel_rotated = image_util.rotateImage(kernel_new, angle * k)
             kernel_norm = kernel_util.kernel_norm(kernel_rotated)
             kernel_list[i, :, :] = kernel_norm
+            weights[i] = weight_list[j]
             i += 1
 
-    kernel_old_rotated = np.zeros((symmetry, kernelsize, kernelsize))
-    for i in range(symmetry):
-        kernel_old_rotated[i, :, :] = kernel_old/np.sum(kernel_old)
+    if combine_with_old is True:
+        kernel_old_rotated = np.zeros((symmetry, kernelsize, kernelsize))
+        for i in range(symmetry):
+            kernel_old_rotated[i, :, :] = kernel_old/np.sum(kernel_old)
+            kernel_list = np.append(kernel_list, kernel_old_rotated, axis=0)
+            weights.append(weights, 1)
 
-    # TODO: add weight_list and mask_list
+    # TODO: add mask_list
     # TODO: outlier detection?
-    kernel_list_new_extended = np.append(kernel_list, kernel_old_rotated, axis=0)
-
-    if weight_list != None:
-        weights = np.append(weight_list, np.sum(kernel_old_rotated))
-    else:
-        weights = [np.sum(l) for l in kernel_list_new_extended]
-        
-    if stacking_option == 'median':
+    if stacking_option == 'median_weight':
+        # TODO: this is rather slow as it needs to loop through all the pixels
         # adapted from this thread: https://stackoverflow.com/questions/26102867/python-weighted-median-algorithm-with-pandas
-        flattened_psfs = np.array([y.flatten() for y in kernel_list_new_extended])
-        x_dim, y_dim = kernel_list_new_extended[0].shape
+        flattened_psfs = np.array([y.flatten() for y in kernel_list])
+        x_dim, y_dim = kernel_list[0].shape
         new_img = []
         for i in range(x_dim * y_dim):
             pixels = flattened_psfs[:, i]
@@ -478,11 +485,11 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
             new_img.append(median)
         kernel_new = np.array(new_img).reshape(x_dim, y_dim)
     elif stacking_option == 'mean':
-        kernel_new = np.average(kernel_list_new_extended, weights = weights, axis=0)
-    elif stacking_option == 'median_default':
-        kernel_new = np.median(kernel_list_new_extended, axis = 0)
+        kernel_new = np.average(kernel_list, weights = weights, axis=0)
+    elif stacking_option == 'median':
+        kernel_new = np.median(kernel_list, axis = 0)
     else:
-        raise ValueError(" stack_option must be 'median' or 'mean', %s is not supported." % stacking_option)
+        raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported." % stacking_option)
     kernel_new = np.nan_to_num(kernel_new)
     kernel_new[kernel_new < 0] = 0
     kernel_new = kernel_util.kernel_norm(kernel_new)
