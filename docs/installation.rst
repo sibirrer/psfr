@@ -28,17 +28,12 @@ From sources
 
 The sources for psfr can be downloaded from the `Github repo`_.
 
-You can either clone the public repository:
+You can clone the public repository:
 
 .. code-block:: console
 
     $ git clone git://github.com/sibirrer/psfr
 
-Or download the `tarball`_:
-
-.. code-block:: console
-
-    $ curl -OJL https://github.com/sibirrer/psfr/tarball/master
 
 Once you have a copy of the source, you can install it with:
 
@@ -48,4 +43,3 @@ Once you have a copy of the source, you can install it with:
 
 
 .. _Github repo: https://github.com/sibirrer/psfr
-.. _tarball: https://github.com/sibirrer/psfr/tarball/master
