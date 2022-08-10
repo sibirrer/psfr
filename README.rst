@@ -2,25 +2,25 @@
 PSFr - Point Spread Function reconstruction
 ===========================================
 
-|PyPI|
+|PyPI| |CI| |Docs| |Coveralls|
 
-.. image:: https://github.com/sibirrer/psfr/workflows/Tests/badge.svg
+.. |CI| image:: https://github.com/sibirrer/psfr/workflows/Tests/badge.svg
     :target: https://github.com/sibirrer/psfr/actions
 
-.. image:: https://readthedocs.org/projects/psfr/badge/?version=latest
+.. |Docs| image:: https://readthedocs.org/projects/psfr/badge/?version=latest
         :target: http://psfr.readthedocs.io/en/latest/?badge=latest
         :alt: Documentation Status
 
-.. image:: https://coveralls.io/repos/github/sibirrer/psfr/badge.svg?branch=main
+.. |Coveralls| image:: https://coveralls.io/repos/github/sibirrer/psfr/badge.svg?branch=main
     :target: https://coveralls.io/github/sibirrer/psfr?branch=main
+
+.. |PyPI| image:: https://img.shields.io/pypi/v/psfr?label=PyPI&logo=pypi
+    :target: https://pypi.python.org/pypi/psfr
 
 .. image:: https://github.com/sibirrer/psfr/blob/main/docs/_static/stacked_psf_animation.gif
 
 Point Spread Function reconstruction for astronomical
 ground- and space-based imaging data.
-
-.. |PyPI| image:: https://img.shields.io/pypi/v/psfr?label=PyPI&logo=pypi
-    :target: https://pypi.python.org/pypi/psfr
 
 
 Example
