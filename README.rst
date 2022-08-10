@@ -11,8 +11,25 @@ Point Spread Function reconstruction for astronomical
 ground- and space-based imaging data.
 
 
-Link to example notebooks
-Link to documentation
+Example
+-------
+
+.. code-block::
+
+    # get cutout stars in the field of a JWST observation (example import)
+    from psfr.util import jwst_example_stars
+    star_list_jwst = jwst_example_stars()
+
+    # run PSF reconstruction (see documentation for further options)
+    from psfr.psfr import stack_psf
+    psf_moswl, center_list, mask_list = stack_psf(star_list_jwst, oversampling=4,
+                                                  saturation_limit=None, num_iteration=50)
+
+
+We further refer to the example Notebook_ and the Documentation_.
+
+.. _Notebook: https://github.com/sibirrer/psfr/blob/main/notebooks/JWST_PSF_reconstruction.ipynb
+.. _Documentation: https://psfr.readthedocs.io/en/latest/installation.html
 
 
 Features

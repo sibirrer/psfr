@@ -94,3 +94,8 @@ def test_regular2oversampled_inverse():
                 npt.assert_almost_equal(image_degraded - image, 0, decimal=8)
             else:
                 npt.assert_almost_equal(image_degraded - image, 0, decimal=3)
+
+
+def test_jwst_example_stars():
+    star_list_jwst = util.jwst_example_stars()
+    assert len(star_list_jwst) == 5

@@ -1,5 +1,8 @@
 import scipy.ndimage.interpolation as interpolation
+import os
+import astropy.io.fits as pyfits
 from lenstronomy.Util import kernel_util, image_util
+import psfr
 
 
 def regular2oversampled(image, oversampling=1):
@@ -67,3 +70,27 @@ def oversampled2regular(image_oversampled, oversampling=1):
         n_pix = int(n / oversampling)
         image_degraded = image_util.cut_edges(image_degraded, n_pix)
     return image_degraded
+
+
+def jwst_example_stars():
+    """
+    imports example stars cutout from early JWST data
+
+    Returns
+    -------
+    star_list : list of 2d arrays
+        cutout stars from JWST data
+    """
+    package_path = psfr.__path__[0]
+    path_stars = os.path.join(package_path, 'Data/JWST/')
+    star_name = 'psf_f090w_star'
+
+    star_list = []
+    for i in range(5):
+        path = os.path.join(path_stars, star_name+str(i)+'.fits')
+        hdulist_star = pyfits.open(path)
+
+        star = hdulist_star[0].data
+        star_list.append(star)
+    return star_list
+
