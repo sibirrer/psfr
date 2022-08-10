@@ -40,11 +40,11 @@ jobs:
         run: |
           pytest --cov=psfr
 
-      #- name: Coveralls
-      #  env:
-      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #  run: |
-      #    coveralls --service=github
+      - name: Coveralls
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          coveralls --service=github
 
       # from this source for coveralls: https://github.com/marketplace/actions/coveralls-github-action
       #- uses: actions/checkout@v1
