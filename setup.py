@@ -19,7 +19,7 @@ setup(
     author_email='sibirrer@gmail.com',
     python_requires='>=3.6',
     classifiers=[
-        'Development Status :: 2 - Beta',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
