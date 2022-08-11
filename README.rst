@@ -51,6 +51,30 @@ Features
 * PSF reconstruction available in super-sampling resolution.
 * Masking pixels, saturation levels and other options to deal with artifacts in the data.
 
+Algorithm
+---------
+The algorithm to iteratively propose a (optionally oversampled) PSF from a set of star cutouts goes as follow:
+
+(1) Find centroid pixel of all the stars
+
+(2) Stack all the stars for an initial guess of the PSF (ignoring sub-pixel offsets)
+
+(3) Fit the subpixel centroid with the PSF model estimate
+
+(4) Shift PSF with sub-pixel interpolation to the sub-pixel position of individual stars
+
+(5) Retrieve residuals of the shifted PSF model relative to the data of the cutouts
+
+(6) Apply an inverse sub-pixel shift of the residuals to be focused on the center of the pixel
+
+(7) Based on teh inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
+
+(8) Repeat step (4) - (7) multiple times with the option to repeat step (3)
+
+
+Details and options for the different steps can be found in the documentation and the source code.
+
+
 Used by
 -------
 PSFr is in use with James Webb Space Telescope imaging data (i.e., `Santini et al. 2022  <https://ui.adsabs.harvard.edu/abs/2022arXiv220711379S/abstract>`_,
