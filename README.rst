@@ -55,21 +55,20 @@ Algorithm
 ---------
 The algorithm to iteratively propose a (optionally oversampled) PSF from a set of star cutouts goes as follow:
 
-(1) Find centroid pixel of all the stars
 
-(2) Stack all the stars for an initial guess of the PSF (ignoring sub-pixel offsets)
+(1) Stack all the stars for an initial guess of the PSF on the centroid pixel (ignoring sub-pixel offsets)
 
-(3) Fit the subpixel centroid with the PSF model estimate
+(2) Fit the subpixel centroid with the PSF model estimate
 
-(4) Shift PSF with sub-pixel interpolation to the sub-pixel position of individual stars
+(3) Shift PSF with sub-pixel interpolation to the sub-pixel position of individual stars
 
-(5) Retrieve residuals of the shifted PSF model relative to the data of the cutouts
+(4) Retrieve residuals of the shifted PSF model relative to the data of the cutouts
 
-(6) Apply an inverse sub-pixel shift of the residuals to be focused on the center of the pixel
+(5) Apply an inverse sub-pixel shift of the residuals to be focused on the center of the pixel
 
-(7) Based on teh inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
+(6) Based on teh inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
 
-(8) Repeat step (4) - (7) multiple times with the option to repeat step (3)
+(7) Repeat step (3) - (6) multiple times with the option to repeat step (3)
 
 
 Details and options for the different steps can be found in the documentation and the source code.
