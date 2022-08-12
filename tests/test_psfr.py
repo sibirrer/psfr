@@ -140,23 +140,6 @@ def test_one_step_psf_estimation():
     # psf_after should be a better guess of psf_true than psf_guess
     diff_after = np.sum((psf_after - psf_true) ** 2)
     diff_before = np.sum((psf_guess - psf_true) ** 2)
-
-    plt.imshow(psf_true - psf_after)
-    plt.colorbar()
-    plt.title('after')
-    plt.close()
-    plt.imshow(psf_true - psf_guess)
-    plt.colorbar()
-    plt.title('before')
-    plt.close()
-
-    plt.imshow(psf_after - psf_guess)
-    plt.colorbar()
-    plt.title('after - before')
-    plt.close()
-
-    print(np.sum(psf_after), np.sum(psf_true))
-
     assert diff_after < diff_before
 
     oversampling = 2
@@ -175,6 +158,14 @@ def test_one_step_psf_estimation():
 
     psf_after_super = psfr.one_step_psf_estimate(star_list, psf_guess_super, center_list, mask_list=None,
                                                  error_map_list=None, step_factor=0.2, oversampling=oversampling)
+    diff_after = np.sum((psf_after_super - psf_true_super) ** 2)
+    diff_before = np.sum((psf_guess_super - psf_true_super) ** 2)
+    assert diff_after < diff_before
+
+    # de-shifting in oversampled space (should be a bit lower quality but still better than initial guess)
+    psf_after_super = psfr.one_step_psf_estimate(star_list, psf_guess_super, center_list, mask_list=None,
+                                                 error_map_list=None, step_factor=0.2, oversampling=oversampling,
+                                                 oversampled_residual_deshifting=True)
     diff_after = np.sum((psf_after_super - psf_true_super) ** 2)
     diff_before = np.sum((psf_guess_super - psf_true_super) ** 2)
     assert diff_after < diff_before
@@ -246,7 +237,7 @@ def test_noisy_psf():
 
     psf_psfr_super_noisy, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb_noisy, oversampling=oversampling, 
                                                   saturation_limit=None, num_iteration=10, 
-                                                  n_recenter=20)
+                                                  n_recenter=5)
     psf_psfr_super, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
                                                   saturation_limit=None, num_iteration=10, 
                                                   n_recenter=20)
