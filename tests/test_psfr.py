@@ -13,6 +13,7 @@ import os
 import astropy.io.fits as pyfits
 np.random.seed(42)
 
+
 def test_shift_psf():
     oversampling = 4
     x, y = 0.2, -0.3
@@ -42,8 +43,7 @@ def test_shift_psf():
     psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=numpix)
 
     if False:
-        import matplotlib.pyplot as plt
-        f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4), sharex=False, sharey=False)
+        f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
         vmin, vmax = -5, -1
         ax = axes[0]
         im = ax.imshow(psf_shifted_true - psf_shifted_psfr, origin='lower')
@@ -136,7 +136,7 @@ def test_one_step_psf_estimation():
         star_list.append(star)
 
     psf_after = psfr.one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, error_map_list=None,
-                                      step_factor=0.2)
+                                           step_factor=0.2)
     # psf_after should be a better guess of psf_true than psf_guess
     diff_after = np.sum((psf_after - psf_true) ** 2)
     diff_before = np.sum((psf_guess - psf_true) ** 2)
@@ -174,7 +174,7 @@ def test_one_step_psf_estimation():
     psf_true_super /= np.sum(psf_true_super)
 
     psf_after_super = psfr.one_step_psf_estimate(star_list, psf_guess_super, center_list, mask_list=None,
-                                            error_map_list=None, step_factor=0.2, oversampling=oversampling)
+                                                 error_map_list=None, step_factor=0.2, oversampling=oversampling)
     diff_after = np.sum((psf_after_super - psf_true_super) ** 2)
     diff_before = np.sum((psf_guess_super - psf_true_super) ** 2)
     assert diff_after < diff_before
@@ -259,3 +259,33 @@ def test_noisy_psf():
     diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
     npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with noisy stars is better than noiseless stars')
 
+
+def test_combine_psf():
+    from psfr.psfr import combine_psf
+    nx, ny = 11, 11
+    module_path = os.path.dirname(psfr.__file__)
+    psf_filename = module_path + '/Data/JWST_mock/psf_f090w_supersample5_crop.fits'
+    kernel = pyfits.getdata(psf_filename)
+    nx, ny = np.shape(kernel)
+    kernel_list_input = []
+    weight_list = np.ones(10)
+    for i in range(10):
+        kernel_list_input.append(np.random.randn(nx, ny) + kernel)
+    diff_input = np.sum((kernel_list_input[0] - kernel) ** 2)
+
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=weight_list, factor=1.,
+                             stacking_option='median', symmetry=1, combine_with_old=True)
+    diff_output = np.sum((kernel_new - kernel) ** 2)
+    assert diff_input > diff_output
+
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=weight_list, factor=1.,
+                             stacking_option='median_weight', symmetry=1, combine_with_old=False)
+    diff_output = np.sum((kernel_new - kernel) ** 2)
+    assert diff_input > diff_output
+
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=None, factor=1.,
+                             stacking_option='mean', symmetry=1, combine_with_old=False)
+    diff_output = np.sum((kernel_new - kernel) ** 2)
+    assert diff_input > diff_output
+
+    npt.assert_raises(ValueError, combine_psf, kernel_list_input, kernel, stacking_option='BAD')

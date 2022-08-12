@@ -241,8 +241,8 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         psf_new[psf_new < 0] = 0
         psf_new /= np.sum(psf_new)
         if verbose:
-            fig = verbose_util.verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction,
-                                                psf_new)
+            fig = verbose_util.verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted,
+                                                correction, psf_new)
             fig.show()
         psf_list_new.append(psf_new)
 

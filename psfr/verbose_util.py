@@ -8,7 +8,7 @@ def verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_s
     plotting of intermediate products happening during one step of the PSF iteration
     """
 
-    f, axes = plt.subplots(1, 7, figsize=(4 * 7, 4))
+    fig, axes = plt.subplots(1, 7, figsize=(4 * 7, 4))
     vmin, vmax = -5, -1
 
     ax = axes[0]
@@ -66,4 +66,4 @@ def verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_s
     cax = divider.append_axes("right", size="5%", pad=0.05)
     plt.colorbar(im, cax=cax)
     ax.set_title('new proposed PSF')
-    return f
+    return fig
