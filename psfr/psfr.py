@@ -7,6 +7,8 @@ import matplotlib.animation as animation
 from lenstronomy.Util import util, kernel_util, image_util
 from psfr.util import regular2oversampled, oversampled2regular
 from psfr import mask_util
+from psfr import verbose_util
+
 
 def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
               verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, **kwargs_animate):
@@ -80,13 +82,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     else:
         psf_guess = psf_initial_guess
     if verbose:
-        f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
-
-        ax = axes[0]
-        ax.imshow(np.log10(star_stack_base), origin='lower')
-        ax.set_title('star_stack_base')
-        plt.show()
-        ax = axes[1]
+        f, axes = plt.subplots(1, 1, figsize=(4 * 2, 4))
+        ax = axes
         ax.imshow(np.log10(psf_guess), origin='lower')
         ax.set_title('input first guess')
         plt.show()
@@ -104,7 +101,6 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         if animation_options['animate']:
             images_to_animate.append(psf_guess)
         if verbose:
-            # TODO: make a movie out of this
             plt.imshow(np.log(psf_guess), vmin=-5, vmax=-1)
             plt.title('iteration %s' % j)
             plt.colorbar()
@@ -120,11 +116,11 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         fig = plt.figure()
         img = plt.imshow(np.log10(images_to_animate[0]))
         cmap = plt.get_cmap('viridis')
-        cmap.set_bad(color = 'k', alpha = 1.)
+        cmap.set_bad(color='k', alpha=1.)
         cmap.set_under('k')
         # animate and display iterative psf reconstuction
         anim = animation.FuncAnimation(fig, _updatefig, frames=len(images_to_animate), 
-                              interval=int(animation_options['duration']/len(images_to_animate)), blit=True)
+                                       interval=int(animation_options['duration']/len(images_to_animate)), blit=True)
         anim.save(animation_options['output_dir'])
         plt.close()
 
@@ -245,7 +241,9 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         psf_new[psf_new < 0] = 0
         psf_new /= np.sum(psf_new)
         if verbose:
-            _verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction, psf_new)
+            fig = verbose_util.verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction,
+                                                psf_new)
+            fig.show()
         psf_list_new.append(psf_new)
 
     # stack all residuals and update the psf guess
@@ -474,7 +472,8 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     # TODO: outlier detection?
     if stacking_option == 'median_weight':
         # TODO: this is rather slow as it needs to loop through all the pixels
-        # adapted from this thread: https://stackoverflow.com/questions/26102867/python-weighted-median-algorithm-with-pandas
+        # adapted from this thread:
+        # https://stackoverflow.com/questions/26102867/python-weighted-median-algorithm-with-pandas
         flattened_psfs = np.array([y.flatten() for y in kernel_list])
         x_dim, y_dim = kernel_list[0].shape
         new_img = []
@@ -487,79 +486,14 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
             new_img.append(median)
         kernel_new = np.array(new_img).reshape(x_dim, y_dim)
     elif stacking_option == 'mean':
-        kernel_new = np.average(kernel_list, weights = weights, axis=0)
+        kernel_new = np.average(kernel_list, weights=weights, axis=0)
     elif stacking_option == 'median':
-        kernel_new = np.median(kernel_list, axis = 0)
+        kernel_new = np.median(kernel_list, axis=0)
     else:
-        raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported." % stacking_option)
+        raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported."
+                         % stacking_option)
     kernel_new = np.nan_to_num(kernel_new)
     kernel_new[kernel_new < 0] = 0
     kernel_new = kernel_util.kernel_norm(kernel_new)
     kernel_return = factor * kernel_new + (1.-factor) * kernel_old
     return kernel_return
-
-
-def _verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction, psf_new):
-    """
-    plotting of intermediate products happening during one step
-    """
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-    f, axes = plt.subplots(1, 7, figsize=(4 * 7, 4))
-    vmin, vmax = -5, -1
-
-    ax = axes[0]
-    im = ax.imshow(np.log10(star / np.sum(star)), origin='lower', vmin=vmin, vmax=vmax)
-    # ax.autoscale(False)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title('star normalized')
-
-    ax = axes[1]
-    im = ax.imshow(np.log10(psf_shifted), origin='lower', vmin=vmin, vmax=vmax)
-    # ax.autoscale(False)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title('psf shifted (oversampled)')
-
-    ax = axes[2]
-    im = ax.imshow(np.log10(psf_shifted_data), origin='lower', vmin=vmin, vmax=vmax)
-    # ax.autoscale(False)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title('psf shifted (regular)')
-
-    ax = axes[3]
-    im = ax.imshow(residuals, origin='lower')
-    # ax.autoscale(False)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title('residuals on data')
-
-    ax = axes[4]
-    im = ax.imshow(residuals_shifted, origin='lower')
-    # ax.autoscale(False)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title('residuals re-centered')
-
-    ax = axes[5]
-    im = ax.imshow(correction, origin='lower')
-    # ax.autoscale(False)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title('corrections on previous PSF')
-
-    ax = axes[6]
-    im = ax.imshow(np.log10(psf_new), origin='lower', vmin=vmin, vmax=vmax)
-    # ax.autoscale(False)
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-    ax.set_title('new proposed PSF')
-    plt.show()
