@@ -12,9 +12,8 @@ def test_verbose_one_step():
     psf_shifted = star
     nx, ny = np.shape(star)
     residuals = np.random.randn(nx, ny)
-    residuals_shifted= residuals
+    residuals_shifted = residuals
     correction = residuals
     psf_new = star
     fig = verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted, correction, psf_new)
     plt.close()
-

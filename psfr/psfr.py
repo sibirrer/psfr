@@ -355,13 +355,15 @@ def _linear_amplitude(data, model, variance=None, mask=None):
         mask_ = util.image2array(mask)
         x = x[mask_ == 1]
         y = y[mask_ == 1]
+    else:
+        mask_ = None
 
     if variance is None:
         w = 1  # we simply give equal weight to all data points
     else:
         w = util.image2array(1. / variance)
-        if mask is not None:
-            w = w[mask == 1]
+        if mask_ is not None:  # mask is not None:
+            w = w[mask_ == 1]
     wsum = np.sum(w)
     xw = np.sum(w * x) / wsum
     yw = np.sum(w * y) / wsum

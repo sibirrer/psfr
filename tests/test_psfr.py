@@ -100,6 +100,11 @@ def test_fit_centroid():
     npt.assert_almost_equal(center[0], x_c, decimal=3)
     npt.assert_almost_equal(center[1], y_c, decimal=3)
 
+    variance = np.ones_like(flux_true)
+    center = psfr.centroid_fit(flux_true, flux_model, mask=None, variance=variance)
+    npt.assert_almost_equal(center[0], x_c, decimal=3)
+    npt.assert_almost_equal(center[1], y_c, decimal=3)
+
 
 def test_one_step_psf_estimation():
     from lenstronomy.LightModel.light_model import LightModel
@@ -174,6 +179,7 @@ def test_one_step_psf_estimation():
     diff_before = np.sum((psf_guess_super - psf_true_super) ** 2)
     assert diff_after < diff_before
 
+
 def test_saturation_limit():
     # check if psf with saturation limit is more accurate than one without
     import lenstronomy.Util.kernel_util as util
@@ -215,6 +221,7 @@ def test_saturation_limit():
     diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
     # reconstructed psf with saturation limit should perform better than without
     npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with saturation limit is worse than without limit')
+
 
 def test_noisy_psf():
     # create 2 psfs with noisy and noiseless stars. checks if noisy psf has larger residual with the true psf
