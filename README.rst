@@ -93,6 +93,11 @@ We also refer to the astropy core package
 `photutils <https://photutils.readthedocs.io/en/stable/index.html>`_
 and in particular to the empirical PSF module
 `ePSF <https://photutils.readthedocs.io/en/stable/epsf.html#build-epsf>`_ .
+PSF reconstructions are e.g. reported by
+`Anderson and King (2000; PASP 112, 1360) <https://ui.adsabs.harvard.edu/abs/2000PASP..112.1360A/abstract>`_
+and
+`Anderson (2016), ISR WFC3 2016-12 <https://www.stsci.edu/files/live/sites/www/files/home/hst/instrumentation/wfc3/documentation/instrument-science-reports-isrs/_documents/2016/WFC3-2016-12.pdf>`_.
+
 
 
 Credits
