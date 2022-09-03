@@ -68,7 +68,7 @@ The algorithm to iteratively propose a (optionally oversampled) PSF from a set o
 
 (6) Based on teh inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
 
-(7) Repeat step (3) - (6) multiple times with the option to repeat step (3)
+(7) Repeat step (3) - (6) multiple times with the option to repeat step (2)
 
 
 Details and options for the different steps can be found in the documentation and the source code.
