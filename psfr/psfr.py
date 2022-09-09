@@ -10,7 +10,7 @@ from psfr import mask_util
 from psfr import verbose_util
 
 
-def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
+def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
               verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, **kwargs_animate):
     """
     Parameters
@@ -22,6 +22,9 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     mask_list : list of 2d boolean or integer arrays, same shape as star_list
         list of masks for each individual star's pixel to be included in the fit or not.
         0 means excluded, 1 means included
+    error_map_list : None, or list of 2d numpy array, same size as data
+        Variance in the uncorrelated uncertainties in the data for individual pixels.
+        If not set, assumes equal variances for all pixels.
     saturation_limit: float or list of floats of length of star_list
         pixel values above this threshold will not be considered in the reconstruction.
     num_iteration : integer >= 1
@@ -61,6 +64,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
         kwargs_one_step = {}
     if kwargs_psf_stacking is None:
         kwargs_psf_stacking = {}
+    if error_map_list is None:
+        error_map_list = [None] * len(star_list)
 
     # update default options for animations
     animation_options = {'animate': False, 'output_dir': 'stacked_psf_animation.gif', 'duration': 5000}
@@ -73,7 +78,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     # estimate center offsets based on base stacking PSF estimate
     center_list = []
     for i, star in enumerate(star_list):
-        x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i])
+        x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i], variance=error_map_list[i])
         center_list.append([x_c, y_c])
 
     # re-size initial guess to oversampled resolution
@@ -91,7 +96,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, saturation_limit=None, 
     # simultaneous iterative correction of PSF starting with base stacking in oversampled resolution
     images_to_animate = []
     for j in range(num_iteration):
-        psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list,
+        psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=error_map_list,
                                           oversampling=oversampling, **kwargs_psf_stacking, **kwargs_one_step)
         if j % n_recenter == 0 and j != 0:
             center_list = []
