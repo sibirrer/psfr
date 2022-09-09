@@ -101,7 +101,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
         if j % n_recenter == 0 and j != 0:
             center_list = []
             for i, star in enumerate(star_list):
-                x_c, y_c = centroid_fit(star, psf_guess, mask_list[i], oversampling=oversampling)
+                x_c, y_c = centroid_fit(star, psf_guess, mask_list[i], oversampling=oversampling,
+                                        variance=error_map_list[i])
                 center_list.append([x_c, y_c])
         if animation_options['animate']:
             images_to_animate.append(psf_guess)
