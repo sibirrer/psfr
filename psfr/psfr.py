@@ -377,7 +377,7 @@ def _linear_amplitude(data, model, variance=None, mask=None):
     return amp
 
 
-def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
+def centroid_fit(data, model, mask=None, variance=None, oversampling=1,optimizer_type = 'NM'):
     """
     fit the centroid of the model to the image by shifting and scaling the model to best match the data
     This is done in a non-linear minimizer in the positions (x, y) and linear amplitude minimization on the fly.
@@ -403,6 +403,48 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
         required shift in units of pixels in the data such that the model matches best the data
     """
 
+    def getProbability(pars, variance, mask, oversampling, model, data):
+
+        model_shifted = shift_psf(psf_center=model, oversampling=oversampling, shift=pars, degrade=True,
+                                  n_pix_star=len(data))
+
+        amp = _linear_amplitude(data, model_shifted, variance=variance, mask=mask)
+
+        chi2 = -1 * np.sum((data - model_shifted * amp) ** 2 / variance * mask)
+        return chi2
+
+
+    ###this function is better if the initial guess (0,0) is far from the center of the pixel.
+    # ##The starting step valueis optimized to my particular pixel size/PSF width ratio,
+    # ##so we probably want someone to be ablte to pass a variable here for more general use.
+
+    def _minimize_emcee(x, data, model, variance, mask, oversampling, nwalkers=25, niter=100, startStep=0.1,
+                        nrestart=2):
+        import emcee
+
+        startVals = np.array([np.array(x) + startStep * np.random.randn(len(x)) for i in range(nwalkers)])
+        sampler = emcee.EnsembleSampler(nwalkers, len(x), getProbability,
+                                        args=[variance, mask, oversampling, model, data])
+        sampler.run_mcmc(startVals, niter)
+
+        chains, probs = sampler.chain, sampler.lnprobability
+
+        bestFit = chains[:, -1, :][probs[:, -1] == probs[:, -1].max()][0]
+
+        for j in range(nrestart - 1):
+            startVals = chains[:, -1, :]
+            sampler = emcee.EnsembleSampler(nwalkers, len(x), getProbability,
+                                            args=[variance, mask, oversampling, model, data])
+            sampler.run_mcmc(startVals, niter)
+
+            chains, probs = sampler.chain, sampler.lnprobability
+
+            bestFit = chains[:, -1, :][probs[:, -1] == probs[:, -1].max()][0]
+        #print(probs[:, -1].max())
+
+        return bestFit
+
+
     def _minimize(x, data, model, variance=None, mask=None, oversampling=1):
         # shift model to proposed astrometric position
         model_shifted = shift_psf(psf_center=model, oversampling=oversampling, shift=x, degrade=True,
@@ -419,9 +461,16 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1):
         return chi2
 
     init = np.array([0, 0])
-    x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
-                                bounds=((-5, 5), (-5, 5)), method='Nelder-Mead')
-    return x.x
+
+
+    if optimizer_type == 'NM':
+        x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
+                                bounds=((-1.5, 1.5), (-1.5, 1.5)), method='Nelder-Mead')
+        return x.x
+    if optimizer_type =='emcee':
+        x =_minimize_emcee(init,data,model,variance, mask,oversampling, nwalkers = 10,niter= 100,startStep = 0.1)
+
+        return x
 
 
 def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, factor=1., stacking_option='median',
@@ -454,15 +503,19 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     """
 
     n = int(len(kernel_list_new) * symmetry)
+
     if weight_list is None:
         weight_list = np.ones(len(kernel_list_new))
+
     angle = 360. / symmetry
     kernelsize = len(kernel_old)
     kernel_list = np.zeros((n, kernelsize, kernelsize))
     weights = np.zeros(n)
     i = 0
     for j, kernel_new in enumerate(kernel_list_new):
+
         for k in range(symmetry):
+
             kernel_rotated = image_util.rotateImage(kernel_new, angle * k)
             kernel_norm = kernel_util.kernel_norm(kernel_rotated)
             kernel_list[i, :, :] = kernel_norm
@@ -493,8 +546,11 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
             median = pixels[cumsum >= cutoff][0]
             new_img.append(median)
         kernel_new = np.array(new_img).reshape(x_dim, y_dim)
+
     elif stacking_option == 'mean':
         kernel_new = np.average(kernel_list, weights=weights, axis=0)
+
+
     elif stacking_option == 'median':
         kernel_new = np.median(kernel_list, axis=0)
     else:
