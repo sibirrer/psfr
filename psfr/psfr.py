@@ -11,7 +11,7 @@ from psfr import verbose_util
 
 
 def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
-              verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, **kwargs_animate):
+              verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, centroid_optimizer ='NM',**kwargs_animate):
     """
     Parameters
     ----------
@@ -78,14 +78,15 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     # estimate center offsets based on base stacking PSF estimate
     center_list = []
     for i, star in enumerate(star_list):
-        x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i], variance=error_map_list[i])
+        x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i], optimizer_type=centroid_optimizer,variance=error_map_list[i])
         center_list.append([x_c, y_c])
 
-    # re-size initial guess to oversampled resolution
+
     if psf_initial_guess is None:
         psf_guess = regular2oversampled(star_stack_base, oversampling=oversampling)
     else:
         psf_guess = psf_initial_guess
+
     if verbose:
         f, axes = plt.subplots(1, 1, figsize=(4 * 2, 4))
         ax = axes
@@ -95,6 +96,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
 
     # simultaneous iterative correction of PSF starting with base stacking in oversampled resolution
     images_to_animate = []
+
     for j in range(num_iteration):
         psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=error_map_list,
                                           oversampling=oversampling, **kwargs_psf_stacking, **kwargs_one_step)
@@ -102,7 +104,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
             center_list = []
             for i, star in enumerate(star_list):
                 x_c, y_c = centroid_fit(star, psf_guess, mask_list[i], oversampling=oversampling,
-                                        variance=error_map_list[i])
+                                        variance=error_map_list[i], optimizer_type=centroid_optimizer)
                 center_list.append([x_c, y_c])
         if animation_options['animate']:
             images_to_animate.append(psf_guess)
@@ -181,7 +183,6 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     for i, star in enumerate(star_list):
         center = center_list[i]
         # shift PSF guess to estimated position of star
-
         # shift PSF to position pre-determined to be the center of the point source, and degrate it to the image
         psf_shifted = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=False, n_pix_star=len(star))
 
@@ -325,10 +326,19 @@ def base_stacking(star_list, mask_list):
     """
     star_stack_base = np.zeros_like(star_list[0])
     weight_map = np.zeros_like(star_list[0])
+
     for i, star in enumerate(star_list):
+
         star_stack_base += star * mask_list[i]
         weight_map += mask_list[i] * np.sum(star)
+
+   ###code can't handle situations where there is never a non-zero pixel
+    weight_map[weight_map==0] = 1e-6
+
     star_stack_base = star_stack_base / weight_map
+
+
+
     return star_stack_base
 
 
