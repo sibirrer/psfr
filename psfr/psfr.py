@@ -437,7 +437,7 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         variance = np.ones_like(data)
 
     if optimizer_type == 'Nelder-Mead':
-        x = scipy.optimize.minimize(_minimize, init, args=(data, model, mask,  variance, oversampling),
+        x = scipy.optimize.minimize(_minimize, init, args=(data, model, mask, variance, oversampling),
                                     bounds=bounds, method='Nelder-Mead')
         return x.x
 
@@ -450,12 +450,11 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         pool = None
         pso = ParticleSwarmOptimizer(_minimize,
                                      lowerLims, upperLims, n_particles,
-                                     pool=pool, args=[data, model,variance, mask],
+                                     pool=pool, args=[data, model, variance, mask],
                                      kwargs={'oversampling': oversampling,
                                              'negative': -1})
 
-
-        result, [log_likelihood_list, pos_list, vel_list] = pso.optimize(n_iterations,verbose = False)
+        result, [log_likelihood_list, pos_list, vel_list] = pso.optimize(n_iterations, verbose=False)
         return result
 
     else:
