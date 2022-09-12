@@ -105,6 +105,31 @@ def test_fit_centroid():
     npt.assert_almost_equal(center[0], x_c, decimal=3)
     npt.assert_almost_equal(center[1], y_c, decimal=3)
 
+def test_fit_centroid_pso():
+    from lenstronomy.LightModel.light_model import LightModel
+    numpix = 41
+
+    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
+    gauss = LightModel(['GAUSSIAN'])
+    x_c, y_c = -3.5, 2.2
+    kwargs_true = [{'amp': 2, 'sigma': 3, 'center_x': x_c, 'center_y': y_c}]
+    kwargs_model = [{'amp': 1, 'sigma': 3, 'center_x': 0, 'center_y': 0}]
+    flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_true)
+    flux_true = util.array2image(flux_true)
+
+    flux_model = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
+    flux_model = util.array2image(flux_model)
+
+    mask = np.ones_like(flux_true)
+
+    center = psfr.centroid_fit(flux_true, flux_model, mask=mask, variance=None, optimizer_type='PSO')
+    npt.assert_almost_equal(center[0], x_c, decimal=3)
+    npt.assert_almost_equal(center[1], y_c, decimal=3)
+
+    variance = np.ones_like(flux_true)
+    center = psfr.centroid_fit(flux_true, flux_model, mask=None, variance=variance,optimizer_type='PSO')
+    npt.assert_almost_equal(center[0], x_c, decimal=3)
+    npt.assert_almost_equal(center[1], y_c, decimal=3)
 
 def test_one_step_psf_estimation():
     from lenstronomy.LightModel.light_model import LightModel
@@ -280,3 +305,9 @@ def test_combine_psf():
     assert diff_input > diff_output
 
     npt.assert_raises(ValueError, combine_psf, kernel_list_input, kernel, stacking_option='BAD')
+
+
+
+
+
+test_fit_centroid_pso()

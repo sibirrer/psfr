@@ -418,18 +418,12 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         required shift in units of pixels in the data such that the model matches best the data
     """
 
-    def _minimize(x, data, model, variance=None, mask=None, oversampling=1, negative=1):
+    def _minimize(x, data, model, mask, variance, oversampling=1, negative=1):
         # shift model to proposed astrometric position
         model_shifted = shift_psf(psf_center=model, oversampling=oversampling, shift=x, degrade=True,
                                   n_pix_star=len(data))
         # linear amplitude
-        if mask is None:
-            mask = np.ones_like(data)
         amp = _linear_amplitude(data, model_shifted, variance=variance, mask=mask)
-
-        if variance is None:
-            variance = 1
-        # compute chi2
 
         chi2 = negative * np.sum((data - model_shifted * amp) ** 2 / variance * mask)
 
@@ -437,9 +431,13 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
 
     init = np.array([0, 0])
     bounds = ((-5, 5), (-5, 5))
+    if mask is None:
+        mask = np.ones_like(data)
+    if variance is None:
+        variance = np.ones_like(data)
 
     if optimizer_type == 'Nelder-Mead':
-        x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
+        x = scipy.optimize.minimize(_minimize, init, args=(data, model, mask,  variance, oversampling),
                                     bounds=bounds, method='Nelder-Mead')
         return x.x
 
@@ -447,16 +445,17 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         lowerLims = np.array([bounds[0][0], bounds[1][0]])
         upperLims = np.array([bounds[0][1], bounds[1][1]])
 
-        n_particles = 25
+        n_particles = 50
         n_iterations = 100
         pool = None
         pso = ParticleSwarmOptimizer(_minimize,
                                      lowerLims, upperLims, n_particles,
-                                     pool=pool, args=[data, model],
-                                     kwargs={'variance': variance, 'mask': mask, 'oversampling': oversampling,
+                                     pool=pool, args=[data, model,variance, mask],
+                                     kwargs={'oversampling': oversampling,
                                              'negative': -1})
 
-        result, [log_likelihood_list, pos_list, vel_list] = pso.optimize(n_iterations)
+
+        result, [log_likelihood_list, pos_list, vel_list] = pso.optimize(n_iterations,verbose = False)
         return result
 
     else:
