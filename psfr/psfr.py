@@ -9,9 +9,13 @@ from psfr.util import regular2oversampled, oversampled2regular
 from psfr import mask_util
 from psfr import verbose_util
 
+from lenstronomy.Sampling.Samplers.pso import ParticleSwarmOptimizer
 
-def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, saturation_limit=None, num_iteration=5, n_recenter=10,
-              verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None, centroid_optimizer ='NM',**kwargs_animate):
+
+def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, saturation_limit=None, num_iteration=5,
+              n_recenter=10,
+              verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None,
+              centroid_optimizer='Nelder-Mead', **kwargs_animate):
     """
     Parameters
     ----------
@@ -45,6 +49,9 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     kwargs_psf_stacking: keyword argument list of arguments going into combine_psf()
         stacking_option : option of stacking, 'mean' or 'median'
         symmetry: integer, imposed symmetry of PSF estimate
+    centroid_optimizer: 'Nelder-Mead' or 'PSO'
+        option for the optimizing algorithm used to find the center of each PSF in data.
+
 
     Returns
     -------
@@ -78,9 +85,9 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     # estimate center offsets based on base stacking PSF estimate
     center_list = []
     for i, star in enumerate(star_list):
-        x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i], optimizer_type=centroid_optimizer,variance=error_map_list[i])
+        x_c, y_c = centroid_fit(star, star_stack_base, mask_list[i], optimizer_type=centroid_optimizer,
+                                variance=error_map_list[i])
         center_list.append([x_c, y_c])
-
 
     if psf_initial_guess is None:
         psf_guess = regular2oversampled(star_stack_base, oversampling=oversampling)
@@ -127,8 +134,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
         cmap.set_bad(color='k', alpha=1.)
         cmap.set_under('k')
         # animate and display iterative psf reconstuction
-        anim = animation.FuncAnimation(fig, _updatefig, frames=len(images_to_animate), 
-                                       interval=int(animation_options['duration']/len(images_to_animate)), blit=True)
+        anim = animation.FuncAnimation(fig, _updatefig, frames=len(images_to_animate),
+                                       interval=int(animation_options['duration'] / len(images_to_animate)), blit=True)
         anim.save(animation_options['output_dir'])
         plt.close()
 
@@ -200,8 +207,8 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             mask_super = regular2oversampled(mask_list[i], oversampling=oversampling)
             # attention the routine is flux conserving and need to be changed for the mask,
             # in case of interpolation we block everything that has a tenth of a mask in there
-            mask_super[mask_super < 1./oversampling**2 / 10] = 0
-            mask_super[mask_super >= 1./oversampling**2 / 10] = 1
+            mask_super[mask_super < 1. / oversampling ** 2 / 10] = 0
+            mask_super[mask_super >= 1. / oversampling ** 2 / 10] = 1
             residuals = (star_super - amp * psf_shifted) * mask_super
             residuals /= amp
 
@@ -229,12 +236,12 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
                 # for even number super-sampling half a super-sampled pixel offset needs to be performed
                 # TODO: move them in all four directions (not only two)
                 residuals_shifted1 = ndimage.shift(residuals, shift=[-shift_y - 0.5, -shift_x - 0.5],
-                                                         order=deshift_order)
+                                                   order=deshift_order)
                 # and the last column and row need to be removed
                 residuals_shifted1 = residuals_shifted1[:-1, :-1]
 
                 residuals_shifted2 = ndimage.shift(residuals, shift=[-shift_y + 0.5, -shift_x + 0.5],
-                                                         order=deshift_order)
+                                                   order=deshift_order)
                 # and the last column and row need to be removed
                 residuals_shifted2 = residuals_shifted2[1:, 1:]
                 residuals_shifted = (residuals_shifted1 + residuals_shifted2) / 2
@@ -328,16 +335,13 @@ def base_stacking(star_list, mask_list):
     weight_map = np.zeros_like(star_list[0])
 
     for i, star in enumerate(star_list):
-
         star_stack_base += star * mask_list[i]
         weight_map += mask_list[i] * np.sum(star)
 
-   ###code can't handle situations where there is never a non-zero pixel
-    weight_map[weight_map==0] = 1e-6
+    ###code can't handle situations where there is never a non-zero pixel
+    weight_map[weight_map == 0] = 1e-6
 
     star_stack_base = star_stack_base / weight_map
-
-
 
     return star_stack_base
 
@@ -387,7 +391,7 @@ def _linear_amplitude(data, model, variance=None, mask=None):
     return amp
 
 
-def centroid_fit(data, model, mask=None, variance=None, oversampling=1,optimizer_type = 'NM'):
+def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimizer_type='Nelder-Mead'):
     """
     fit the centroid of the model to the image by shifting and scaling the model to best match the data
     This is done in a non-linear minimizer in the positions (x, y) and linear amplitude minimization on the fly.
@@ -406,6 +410,7 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1,optimizer
         Variance in the uncorrelated uncertainties in the data for individual pixels
     oversampling : integer >= 1
         oversampling factor per axis of the model relative to the data and coordinate shift
+    optimizer_type: 'Nelder-Mead' or 'PSO'
 
     Returns
     -------
@@ -413,49 +418,7 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1,optimizer
         required shift in units of pixels in the data such that the model matches best the data
     """
 
-    def getProbability(pars, variance, mask, oversampling, model, data):
-
-        model_shifted = shift_psf(psf_center=model, oversampling=oversampling, shift=pars, degrade=True,
-                                  n_pix_star=len(data))
-
-        amp = _linear_amplitude(data, model_shifted, variance=variance, mask=mask)
-
-        chi2 = -1 * np.sum((data - model_shifted * amp) ** 2 / variance * mask)
-        return chi2
-
-
-    ###this function is better if the initial guess (0,0) is far from the center of the pixel.
-    # ##The starting step valueis optimized to my particular pixel size/PSF width ratio,
-    # ##so we probably want someone to be ablte to pass a variable here for more general use.
-
-    def _minimize_emcee(x, data, model, variance, mask, oversampling, nwalkers=25, niter=100, startStep=0.1,
-                        nrestart=2):
-        import emcee
-
-        startVals = np.array([np.array(x) + startStep * np.random.randn(len(x)) for i in range(nwalkers)])
-        sampler = emcee.EnsembleSampler(nwalkers, len(x), getProbability,
-                                        args=[variance, mask, oversampling, model, data])
-        sampler.run_mcmc(startVals, niter)
-
-        chains, probs = sampler.chain, sampler.lnprobability
-
-        bestFit = chains[:, -1, :][probs[:, -1] == probs[:, -1].max()][0]
-
-        for j in range(nrestart - 1):
-            startVals = chains[:, -1, :]
-            sampler = emcee.EnsembleSampler(nwalkers, len(x), getProbability,
-                                            args=[variance, mask, oversampling, model, data])
-            sampler.run_mcmc(startVals, niter)
-
-            chains, probs = sampler.chain, sampler.lnprobability
-
-            bestFit = chains[:, -1, :][probs[:, -1] == probs[:, -1].max()][0]
-        #print(probs[:, -1].max())
-
-        return bestFit
-
-
-    def _minimize(x, data, model, variance=None, mask=None, oversampling=1):
+    def _minimize(x, data, model, variance=None, mask=None, oversampling=1, negative=1):
         # shift model to proposed astrometric position
         model_shifted = shift_psf(psf_center=model, oversampling=oversampling, shift=x, degrade=True,
                                   n_pix_star=len(data))
@@ -467,20 +430,37 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1,optimizer
         if variance is None:
             variance = 1
         # compute chi2
-        chi2 = np.sum((data - model_shifted * amp) ** 2 / variance * mask)
+
+        chi2 = negative * np.sum((data - model_shifted * amp) ** 2 / variance * mask)
+
         return chi2
 
     init = np.array([0, 0])
+    bounds = ((-5, 5), (-5, 5))
 
-
-    if optimizer_type == 'NM':
+    if optimizer_type == 'Nelder-Mead':
         x = scipy.optimize.minimize(_minimize, init, args=(data, model, variance, mask, oversampling),
-                                bounds=((-1.5, 1.5), (-1.5, 1.5)), method='Nelder-Mead')
+                                    bounds=bounds, method='Nelder-Mead')
         return x.x
-    if optimizer_type =='emcee':
-        x =_minimize_emcee(init,data,model,variance, mask,oversampling, nwalkers = 10,niter= 100,startStep = 0.1)
 
-        return x
+    elif optimizer_type == 'PSO':
+        lowerLims = np.array([bounds[0][0], bounds[1][0]])
+        upperLims = np.array([bounds[0][1], bounds[1][1]])
+
+        n_particles = 25
+        n_iterations = 100
+        pool = None
+        pso = ParticleSwarmOptimizer(_minimize,
+                                     lowerLims, upperLims, n_particles,
+                                     pool=pool, args=[data, model],
+                                     kwargs={'variance': variance, 'mask': mask, 'oversampling': oversampling,
+                                             'negative': -1})
+
+        result, [log_likelihood_list, pos_list, vel_list] = pso.optimize(n_iterations)
+        return result
+
+    else:
+        raise ValueError('optimization type %s is not supported. Please use Nelder-Mead or PSO' % optimizer_type)
 
 
 def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, factor=1., stacking_option='median',
@@ -525,7 +505,6 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     for j, kernel_new in enumerate(kernel_list_new):
 
         for k in range(symmetry):
-
             kernel_rotated = image_util.rotateImage(kernel_new, angle * k)
             kernel_norm = kernel_util.kernel_norm(kernel_rotated)
             kernel_list[i, :, :] = kernel_norm
@@ -535,7 +514,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     if combine_with_old is True:
         kernel_old_rotated = np.zeros((symmetry, kernelsize, kernelsize))
         for i in range(symmetry):
-            kernel_old_rotated[i, :, :] = kernel_old/np.sum(kernel_old)
+            kernel_old_rotated[i, :, :] = kernel_old / np.sum(kernel_old)
             kernel_list = np.append(kernel_list, kernel_old_rotated, axis=0)
             weights = np.append(weights, 1)
 
@@ -560,7 +539,6 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     elif stacking_option == 'mean':
         kernel_new = np.average(kernel_list, weights=weights, axis=0)
 
-
     elif stacking_option == 'median':
         kernel_new = np.median(kernel_list, axis=0)
     else:
@@ -569,5 +547,5 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     kernel_new = np.nan_to_num(kernel_new)
     kernel_new[kernel_new < 0] = 0
     kernel_new = kernel_util.kernel_norm(kernel_new)
-    kernel_return = factor * kernel_new + (1.-factor) * kernel_old
+    kernel_return = factor * kernel_new + (1. - factor) * kernel_old
     return kernel_return
