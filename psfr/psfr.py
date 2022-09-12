@@ -339,7 +339,7 @@ def base_stacking(star_list, mask_list):
         weight_map += mask_list[i] * np.sum(star)
 
     ###code can't handle situations where there is never a non-zero pixel
-    weight_map[weight_map == 0] = 1e-6
+    weight_map[weight_map == 0] = 1e-12
 
     star_stack_base = star_stack_base / weight_map
 
