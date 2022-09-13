@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 import astropy.io.fits as pyfits
+
 np.random.seed(42)
 
 
@@ -106,6 +107,33 @@ def test_fit_centroid():
     npt.assert_almost_equal(center[1], y_c, decimal=3)
 
 
+def test_fit_centroid_pso():
+    from lenstronomy.LightModel.light_model import LightModel
+    numpix = 41
+
+    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
+    gauss = LightModel(['GAUSSIAN'])
+    x_c, y_c = -3.5, 2.2
+    kwargs_true = [{'amp': 2, 'sigma': 3, 'center_x': x_c, 'center_y': y_c}]
+    kwargs_model = [{'amp': 1, 'sigma': 3, 'center_x': 0, 'center_y': 0}]
+    flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_true)
+    flux_true = util.array2image(flux_true)
+
+    flux_model = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
+    flux_model = util.array2image(flux_model)
+
+    mask = np.ones_like(flux_true)
+
+    center = psfr.centroid_fit(flux_true, flux_model, mask=mask, variance=None, optimizer_type='PSO')
+    npt.assert_almost_equal(center[0], x_c, decimal=3)
+    npt.assert_almost_equal(center[1], y_c, decimal=3)
+
+    variance = np.ones_like(flux_true)
+    center = psfr.centroid_fit(flux_true, flux_model, mask=None, variance=variance, optimizer_type='PSO')
+    npt.assert_almost_equal(center[0], x_c, decimal=3)
+    npt.assert_almost_equal(center[1], y_c, decimal=3)
+
+
 def test_one_step_psf_estimation():
     from lenstronomy.LightModel.light_model import LightModel
     numpix = 21
@@ -183,33 +211,37 @@ def test_saturation_limit():
     star_list_webb = []
     x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
     # very bright star added to list of stars and all flux values above saturation limit fixed
-    bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * 4000
+    bright_star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True,
+                                 n_pix_star=kernel.shape[0] / oversampling) * 4000
     bright_star[bright_star > saturation_limit] = saturation_limit
 
     # 5 less bright stars are added
-    brightnesses = np.abs(np.random.normal(400 ,100 , 10))
+    brightnesses = np.abs(np.random.normal(400, 100, 10))
     star_list_webb.append(bright_star)
     for i in range(10):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
         # star generated and flux multiplied by relevant brightness factor
-        star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
+        star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True,
+                              n_pix_star=kernel.shape[0] / oversampling) * brightnesses[i]
         star_list_webb.append(star)
 
     # psf reconstructed with a saturation limit
-    psf_psfr_super_sat, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
-                                                  saturation_limit=saturation_limit, num_iteration=10, 
-                                                  n_recenter=20)
+    psf_psfr_super_sat, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb,
+                                                                                   oversampling=oversampling,
+                                                                                   saturation_limit=saturation_limit,
+                                                                                   num_iteration=10,
+                                                                                   n_recenter=20)
     # psf reconstructed without a saturation limit
-    psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
-                                                  saturation_limit=None, num_iteration=10, 
-                                                  n_recenter=20)
-                                                
+    psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling,
+                                                                       saturation_limit=None, num_iteration=10,
+                                                                       n_recenter=20)
+
     kernel_degraded = util.degrade_kernel(kernel, oversampling)
     stacked_psf_sat_degraded = psfr.oversampled2regular(psf_psfr_super_sat, oversampling)
     stacked_psf_degraded = psfr.oversampled2regular(psf_psfr_super, oversampling)
 
-    diff1 = np.sum((stacked_psf_sat_degraded - kernel_degraded)**2)
-    diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
+    diff1 = np.sum((stacked_psf_sat_degraded - kernel_degraded) ** 2)
+    diff2 = np.sum((stacked_psf_degraded - kernel_degraded) ** 2)
     # reconstructed psf with saturation limit should perform better than without
     npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with saturation limit is worse than without limit')
 
@@ -228,26 +260,30 @@ def test_noisy_psf():
     brightnesses = abs(np.random.normal(loc=600, scale=200, size=(5,)))
     for i in range(5):
         x_shift, y_shift = np.random.uniform(-0.5, 0.5), np.random.uniform(-0.5, 0.5)
-        star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling) * brightnesses[i]
+        star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True,
+                              n_pix_star=kernel.shape[0] / oversampling) * brightnesses[i]
         star_list_webb.append(star)
-        star_n1 = image_util.add_poisson(star, exp_time = 100.)
-        star_n2 = image_util.add_background(star, sigma_bkd = 0.5)
+        star_n1 = image_util.add_poisson(star, exp_time=100.)
+        star_n2 = image_util.add_background(star, sigma_bkd=0.5)
         star_noisy = star + star_n1 + star_n2
         star_list_webb_noisy.append(star_noisy)
 
-    psf_psfr_super_noisy, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb_noisy, oversampling=oversampling, 
-                                                  saturation_limit=None, num_iteration=10, 
-                                                  n_recenter=5)
-    psf_psfr_super, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
-                                                  saturation_limit=None, num_iteration=10, 
-                                                  n_recenter=20)
-                                                
+    psf_psfr_super_noisy, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb_noisy,
+                                                                                     oversampling=oversampling,
+                                                                                     saturation_limit=None,
+                                                                                     num_iteration=10,
+                                                                                     n_recenter=5)
+    psf_psfr_super, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb,
+                                                                               oversampling=oversampling,
+                                                                               saturation_limit=None, num_iteration=10,
+                                                                               n_recenter=20)
+
     kernel_degraded = util.degrade_kernel(kernel, oversampling)
     stacked_psf_noisy_degraded = psfr.oversampled2regular(psf_psfr_super_noisy, oversampling)
     stacked_psf_degraded = psfr.oversampled2regular(psf_psfr_super, oversampling)
 
-    diff1 = np.sum((stacked_psf_noisy_degraded - kernel_degraded)**2)
-    diff2 = np.sum((stacked_psf_degraded - kernel_degraded)**2)
+    diff1 = np.sum((stacked_psf_noisy_degraded - kernel_degraded) ** 2)
+    diff2 = np.sum((stacked_psf_degraded - kernel_degraded) ** 2)
     npt.assert_array_less(diff2, diff1, err_msg='reconstructed psf with noisy stars is better than noiseless stars')
 
 
@@ -278,5 +314,3 @@ def test_combine_psf():
                              stacking_option='mean', symmetry=1, combine_with_old=False)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
-
-    npt.assert_raises(ValueError, combine_psf, kernel_list_input, kernel, stacking_option='BAD')
