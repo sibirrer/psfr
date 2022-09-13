@@ -252,6 +252,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         # normalize residuals
         correction = residuals_shifted - np.mean(residuals_shifted)
         psf_new = psf_guess + correction
+        # not really needed
         psf_new[psf_new < 0] = 0
         psf_new /= np.sum(psf_new)
         if verbose:
@@ -538,6 +539,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         kernel_new = np.average(kernel_list, weights=weights, axis=0)
 
     elif stacking_option == 'median':
+        # TODO ignore masked pixels instead of over-writing with old one
         kernel_new = np.median(kernel_list, axis=0)
     else:
         raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported."
