@@ -549,7 +549,23 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
 
     elif stacking_option == 'median':
         # TODO ignore masked pixels instead of over-writing with old one
-        kernel_new = np.median(kernel_list, axis=0)
+        if mask_list is None:
+            kernel_new = np.median(kernel_list, axis=0)
+        else:
+            x_dim, y_dim = kernel_list[0].shape
+            new_img = []
+            flattened_psfs = np.array([y.flatten() for y in kernel_list])
+            flattened_mask = np.array([y.flatten() for y in mask_list])
+            for i in range(x_dim * y_dim):
+                # slice through same pixels in all kernels
+                pixels = flattened_psfs[:, i]
+                # slice through same pixels in all masks
+                masks = flattened_mask[:, i]
+                # select only those entries that are not masked
+                pixel_select = pixels[masks > 0]
+                # compute median of those values only
+                new_img.append(np.median(pixel_select))
+            kernel_new = np.array(new_img).reshape(x_dim, y_dim)
     else:
         raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported."
                          % stacking_option)
