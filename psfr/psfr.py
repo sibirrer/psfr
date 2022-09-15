@@ -66,7 +66,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
 
     """
     # update the mask according to settings
-    mask_list = mask_util.mask_configuration(star_list, mask_list=mask_list, saturation_limit=saturation_limit)
+    mask_list, use_mask = mask_util.mask_configuration(star_list, mask_list=mask_list, saturation_limit=saturation_limit)
     if kwargs_one_step is None:
         kwargs_one_step = {}
     if kwargs_psf_stacking is None:
@@ -103,9 +103,12 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
 
     # simultaneous iterative correction of PSF starting with base stacking in oversampled resolution
     images_to_animate = []
-
+    if use_mask:
+        mask_list_one_step = mask_list
+    else:
+        mask_list_one_step = None
     for j in range(num_iteration):
-        psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=error_map_list,
+        psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list_one_step, error_map_list=error_map_list,
                                           oversampling=oversampling, **kwargs_psf_stacking, **kwargs_one_step)
         if j % n_recenter == 0 and j != 0:
             center_list = []
@@ -142,7 +145,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     return psf_guess, center_list, mask_list
 
 
-def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_map_list=None, oversampling=1,
+def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, error_map_list=None, oversampling=1,
                           step_factor=0.2, oversampled_residual_deshifting=False, deshift_order=1, verbose=False,
                           **kwargs_psf_stacking):
     """
@@ -179,10 +182,18 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     verbose : boolean
         If True, provides plots of intermediate products walking through one iteration process for each individual star
     """
+    # creating oversampled mask
     if mask_list is None:
-        mask_list = []
+        mask_list_ = []
         for i, star in enumerate(star_list):
-            mask_list.append(np.ones_like(star))
+            mask_list_.append(np.ones_like(star))
+        mask_list_oversampled = None
+    else:
+        mask_list_ = mask_list
+        mask_list_oversampled = []
+        for mask in mask_list_:
+            mask_ = regular2oversampled(mask, oversampling=oversampling)
+            mask_list_oversampled.append(mask_)
     if error_map_list is None:
         error_map_list = [None] * len(star_list)
     psf_list_new = []
@@ -198,13 +209,13 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         # make sure size is the same as the data and normalized to sum = 1
         psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
         # linear inversion in 1d
-        amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list[i])
+        amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list_[i])
         weight_list.append(amp)
 
         # compute residuals on data
         if oversampled_residual_deshifting:  # directly in oversampled space
             star_super = regular2oversampled(star, oversampling=oversampling)  # TODO: needs only be calculated once!
-            mask_super = regular2oversampled(mask_list[i], oversampling=oversampling)
+            mask_super = regular2oversampled(mask_list_[i], oversampling=oversampling)
             # attention the routine is flux conserving and need to be changed for the mask,
             # in case of interpolation we block everything that has a tenth of a mask in there
             mask_super[mask_super < 1. / oversampling ** 2 / 10] = 0
@@ -219,7 +230,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
             residuals_shifted = ndimage.shift(residuals, shift=[-shift_y, -shift_x], order=deshift_order)
 
         else:  # in data space and then being oversampled
-            residuals = (star - amp * psf_shifted_data) * mask_list[i]
+            residuals = (star - amp * psf_shifted_data) * mask_list_[i]
             # re-normalize residuals
             residuals /= amp  # divide by amplitude of point source
             # high-res version of residuals
@@ -268,11 +279,8 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
     weight_list[weight_list < 0] = 0
     # the weights are supposed to be Poisson noise dominated, which scales as the square root of the brightness
     weights_psf_combined = np.sqrt(weight_list)
-    # creating oversampled mask
-    mask_list_oversampled = []
-    for mask in mask_list:
-        mask_ = regular2oversampled(mask, oversampling=oversampling)
-        mask_list_oversampled.append(mask_)
+
+    # TODO: None as input for mask_list if mask are irrelevant
     kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list_oversampled,
                              weight_list=weights_psf_combined, **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
@@ -343,7 +351,7 @@ def base_stacking(star_list, mask_list):
         star_stack_base += star * mask_list[i]
         weight_map += mask_list[i] * np.sum(star)
 
-    ###code can't handle situations where there is never a non-zero pixel
+    # code can't handle situations where there is never a non-zero pixel
     weight_map[weight_map == 0] = 1e-12
 
     star_stack_base = star_stack_base / weight_map
@@ -524,7 +532,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         for i in range(symmetry):
             kernel_old_rotated[i, :, :] = kernel_old / np.sum(kernel_old)
             kernel_list = np.append(kernel_list, kernel_old_rotated, axis=0)
-            weights = np.append(weights, kernel_old)  # TODO: check whether format is still correct
+            weights = np.append(weights, kernel_old)
 
     # TODO: outlier detection?
     if stacking_option == 'median_weight':
@@ -548,24 +556,23 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         kernel_new = np.average(kernel_list, weights=weights, axis=0)
 
     elif stacking_option == 'median':
-        # TODO ignore masked pixels instead of over-writing with old one
         if mask_list is None:
             kernel_new = np.median(kernel_list, axis=0)
         else:
+            # ignore masked pixels instead of over-writing with old one
+            mask_list = np.array(mask_list)
             x_dim, y_dim = kernel_list[0].shape
-            new_img = []
-            flattened_psfs = np.array([y.flatten() for y in kernel_list])
-            flattened_mask = np.array([y.flatten() for y in mask_list])
-            for i in range(x_dim * y_dim):
-                # slice through same pixels in all kernels
-                pixels = flattened_psfs[:, i]
-                # slice through same pixels in all masks
-                masks = flattened_mask[:, i]
-                # select only those entries that are not masked
-                pixel_select = pixels[masks > 0]
-                # compute median of those values only
-                new_img.append(np.median(pixel_select))
-            kernel_new = np.array(new_img).reshape(x_dim, y_dim)
+            kernel_new = np.zeros((x_dim, y_dim))
+            for i in range(x_dim):
+                for j in range(y_dim):
+                    # slice through same pixels in all kernels
+                    pixels = kernel_list[:, i, j]
+                    # slice through same pixels in all masks
+                    masks = mask_list[:, i, j]
+                    # select only those entries that are not masked
+                    pixel_select = pixels[masks > 0]
+                    # compute median of those values only
+                    kernel_new[i, j] = np.median(pixel_select)
     else:
         raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported."
                          % stacking_option)

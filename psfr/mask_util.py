@@ -19,7 +19,13 @@ def mask_configuration(star_list, mask_list=None, saturation_limit=None):
     -------
     mask_list : list of 2d boolean or integer arrays, same shape as star_list
         an updated list of masks for each individual star taking into account saturation
+    use_mask : boolean
+        if True, indicates that the masks need to be used, otherwise calculations will ignore mask for speed-ups
     """
+    if saturation_limit is None and mask_list is None:
+        use_mask = False
+    else:
+        use_mask = True
     n_star = len(star_list)
     # define saturation masks
     if saturation_limit is not None:
@@ -39,4 +45,4 @@ def mask_configuration(star_list, mask_list=None, saturation_limit=None):
     if saturation_limit is not None:
         for i, mask in enumerate(mask_list):
             mask[star_list[i] > saturation_limit[i]] = 0
-    return mask_list
+    return mask_list, use_mask

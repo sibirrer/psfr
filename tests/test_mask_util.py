@@ -10,17 +10,19 @@ def test_mask_configuration():
     star_list = [star1, star2]
 
     # testing no mask
-    mask_list = mask_configuration(star_list, mask_list=None, saturation_limit=None)
+    mask_list, use_mask = mask_configuration(star_list, mask_list=None, saturation_limit=None)
     npt.assert_almost_equal(star1, mask_list[0], decimal=6)
     npt.assert_almost_equal(star1, mask_list[1], decimal=6)
+    assert use_mask is False
 
     # testing single saturation
-    mask_list = mask_configuration(star_list, mask_list=None, saturation_limit=2)
+    mask_list, use_mask = mask_configuration(star_list, mask_list=None, saturation_limit=2)
     npt.assert_almost_equal(star1, mask_list[0], decimal=6)
     npt.assert_almost_equal(np.zeros_like(star2), mask_list[1], decimal=6)
+    assert use_mask
 
     # testing list of saturation limits
-    mask_list = mask_configuration(star_list, mask_list=None, saturation_limit=[0.1, 100])
+    mask_list, use_mask = mask_configuration(star_list, mask_list=None, saturation_limit=[0.1, 100])
     npt.assert_almost_equal(np.zeros_like(star1), mask_list[0], decimal=6)
     npt.assert_almost_equal(star1, mask_list[1], decimal=6)
 
