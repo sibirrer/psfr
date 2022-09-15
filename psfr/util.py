@@ -64,6 +64,15 @@ def oversampled2regular(image_oversampled, oversampling=1):
         TODO: documentation here not accurate
     """
     image_degraded = kernel_util.degrade_kernel(image_oversampled, oversampling)
+    # if oversampling == 1:
+    #    return image_oversampled
+    # if oversampling % 2 == 0:
+    #    image_degraded = kernel_util.averaging_even_kernel(image_oversampled, oversampling)
+    # else:
+    #    image_degraded = kernel_util.averaging_odd_kernel(image_oversampled, oversampling)
+    #    # degrading_factor**2  # multiplicative factor added when providing flux conservation
+    #    image_degraded *= oversampling ** 2
+
     n = len(image_oversampled)
     # TODO: this should be in a single function and not compensating for kernel_util.degrade_kernel()
     if n % oversampling == 0:

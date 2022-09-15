@@ -47,7 +47,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
             {animate: bool, output_dir: str (directory to save animation in),
             duration: int (length of animation in milliseconds)}
     kwargs_psf_stacking: keyword argument list of arguments going into combine_psf()
-        stacking_option : option of stacking, 'mean' or 'median'
+        stacking_option : option of stacking, 'mean',  'median' or 'median_weight'
         symmetry: integer, imposed symmetry of PSF estimate
     centroid_optimizer: 'Nelder-Mead' or 'PSO'
         option for the optimizing algorithm used to find the center of each PSF in data.
@@ -174,7 +174,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         weight of updated estimate based on new and old estimate;
         psf_update = step_factor * psf_new + (1 - step_factor) * psf_old
     kwargs_psf_stacking: keyword argument list of arguments going into combine_psf()
-        stacking_option : option of stacking, 'mean' or 'median'
+        stacking_option : option of stacking, 'mean',  'median' or 'median_weight'
         symmetry: integer, imposed symmetry of PSF estimate
     verbose : boolean
         If True, provides plots of intermediate products walking through one iteration process for each individual star
@@ -262,14 +262,18 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list, error_ma
         psf_list_new.append(psf_new)
 
     # stack all residuals and update the psf guess
-    # TODO: make combine_psf remember the masks and relative brightness in the weighting scheme (for later)
     psf_stacking_options = {'stacking_option': 'median', 'symmetry': 1}
     psf_stacking_options.update(kwargs_psf_stacking)
     weight_list = np.array(weight_list)
     weight_list[weight_list < 0] = 0
     # the weights are supposed to be Poisson noise dominated, which scales as the square root of the brightness
     weights_psf_combined = np.sqrt(weight_list)
-    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list,
+    # creating oversampled mask
+    mask_list_oversampled = []
+    for mask in mask_list:
+        mask_ = regular2oversampled(mask, oversampling=oversampling)
+        mask_list_oversampled.append(mask_)
+    kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list_oversampled,
                              weight_list=weights_psf_combined, **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
@@ -499,15 +503,20 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
     angle = 360. / symmetry
     kernelsize = len(kernel_old)
     kernel_list = np.zeros((n, kernelsize, kernelsize))
-    weights = np.zeros(n)
+    weights = np.zeros((n, kernelsize, kernelsize))
     i = 0
     for j, kernel_new in enumerate(kernel_list_new):
+        if mask_list is None:
+            mask = 1
+        else:
+            mask = mask_list[i]
 
         for k in range(symmetry):
             kernel_rotated = image_util.rotateImage(kernel_new, angle * k)
             kernel_norm = kernel_util.kernel_norm(kernel_rotated)
             kernel_list[i, :, :] = kernel_norm
-            weights[i] = weight_list[j]
+            # weight according to surface brightness and mask
+            weights[i, :, :] = weight_list[j] * kernel_old * mask
             i += 1
 
     if combine_with_old is True:
@@ -515,21 +524,21 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         for i in range(symmetry):
             kernel_old_rotated[i, :, :] = kernel_old / np.sum(kernel_old)
             kernel_list = np.append(kernel_list, kernel_old_rotated, axis=0)
-            weights = np.append(weights, 1)
+            weights = np.append(weights, kernel_old)  # TODO: check whether format is still correct
 
-    # TODO: add mask_list
     # TODO: outlier detection?
     if stacking_option == 'median_weight':
         # TODO: this is rather slow as it needs to loop through all the pixels
         # adapted from this thread:
         # https://stackoverflow.com/questions/26102867/python-weighted-median-algorithm-with-pandas
         flattened_psfs = np.array([y.flatten() for y in kernel_list])
+        flattened_weights = np.array([y.flatten() for y in weights])
         x_dim, y_dim = kernel_list[0].shape
         new_img = []
         for i in range(x_dim * y_dim):
             pixels = flattened_psfs[:, i]
-            cumsum = np.cumsum(weights)
-            cutoff = np.sum(weights) / 2.0
+            cumsum = np.cumsum(flattened_weights[:, i])  # weights
+            cutoff = np.sum(flattened_weights[:, i]) / 2.0  # weights
             pixels = np.sort(pixels)
             median = pixels[cumsum >= cutoff][0]
             new_img.append(median)
