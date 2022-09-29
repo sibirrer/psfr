@@ -25,7 +25,7 @@ affiliations:
     index: 2
   - name: Department of Physics and Astronomy, Stony Brook University, Stony Brook, NY 11794, USA
     index: 3
-  - name: Highschool
+  - name: St Paul's High School, Lonsdale Rd, London SW13 9JT
     index: 4
   - name: University of California Merced, Department of Physics 5200 North Lake Rd. Merced, CA 9534, USA
     index 5
