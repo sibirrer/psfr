@@ -55,12 +55,12 @@ The point spread function (PSF) of astronomical imaging data is dominated by dif
 and by the athomspheric distortions of the wavefront for ground-based observatories.
 The characterization of the PSF at and below the pixel level of the data
 is a key component to extract accurate and precise information from telescope facilities on the pixel-level data.
-For example, the PSF model is crucial in providing high-precisino positional (astrometric) information of objects at 
+For example, the PSF model is crucial in providing high-precision positional (astrometric) information of objects at 
 sub-pixel scales, to de-blend different astronomical sources and their respective fluxes, 
 or to describe the intrinsic shape and morphologies of galaxies.
 
-The PSF is often time-varying, wavelenght and color dependent, and changes with the position on the focal point of the 
-instrument. The most accurate and precise models of the PSF could often be derived empirically from the same or 
+The PSF is often time-varying, wavelength and color dependent, and changes with the position on the focal point of the 
+instrument. The most accurate and precise models of the PSF can often be derived empirically from the same or 
 near-identical observations in time and space. In particular, objects in the imaging data that are bright and known to 
 be point-like provide a realization of the sampling of the PSF [@AndersenKing:2000]. 
 The combination and interpolation between several point-like objects in imaging data allows us to gain information 
@@ -76,7 +76,7 @@ The API supports the masking of pixels, scoping with saturation in the CCD detec
 
 The algorithm was first used to iteratively reconstruct the PSF in the modeling of doubly and quadruply lensed quasars 
 from HST imaging data on HST imaging data [@Birrer:2017; @Birrer:2019; @Shajib:2019; @Shajib:2020; @Schmidt:2022]
-and ground-based adaptive optics imaging [@Shajib:2021]. With first light of JWST, the method has been refined and has 
+and ground-based adaptive optics imaging [@Shajib:2021]. With the first light of JWST, the method has been refined and has 
 since been used for studies of galaxy evolution and quasar-host galaxy docomposition studies [@Santini:2022; @Merlin:2022; @Yang:2022; @Ding:2022].
 
 
@@ -84,7 +84,7 @@ since been used for studies of galaxy evolution and quasar-host galaxy docomposi
 
 # Algorithm
 
-The algorithm to iteratively propose a (optionally oversampled) PSF from a set of star cutouts goes as follow:
+The algorithm to iteratively propose a (optionally oversampled) PSF from a set of star cutouts goes as follows:
 
 
 (1) Stack all the stars for an initial guess of the PSF on the centroid pixel (ignoring sub-pixel offsets)
@@ -97,9 +97,9 @@ The algorithm to iteratively propose a (optionally oversampled) PSF from a set o
 
 (5) Apply an inverse sub-pixel shift of the residuals to be focused on the center of the pixel
 
-(6) Based on teh inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
+(6) Based on the inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
 
-(7) Repeat step (3) - (6) multiple times with the option to repeat step (2)
+(7) Repeat steps (3) - (6) multiple times with the option to repeat step (2)
 
 Details and options for the different steps can be found in the documentation and the source code.
 
