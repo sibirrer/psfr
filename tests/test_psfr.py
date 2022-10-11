@@ -230,7 +230,8 @@ def test_saturation_limit():
                                                                                    oversampling=oversampling,
                                                                                    saturation_limit=saturation_limit,
                                                                                    num_iteration=10,
-                                                                                   n_recenter=20)
+                                                                                   n_recenter=20,
+                                                                                   centroid_optimizer='Nelder-Mead')
     # psf reconstructed without a saturation limit
     psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling,
                                                                        saturation_limit=None, num_iteration=10,
