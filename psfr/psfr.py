@@ -15,7 +15,7 @@ from lenstronomy.Sampling.Samplers.pso import ParticleSwarmOptimizer
 def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, saturation_limit=None, num_iteration=5,
               n_recenter=10,
               verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None,
-              centroid_optimizer='PSO', **kwargs_animate):
+              centroid_optimizer='Nelder-Mead', **kwargs_animate):
     """
     Parameters
     ----------
