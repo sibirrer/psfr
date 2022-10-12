@@ -4,11 +4,12 @@
 
 from psfr import psfr
 from lenstronomy.Util import kernel_util
-import numpy.testing as npt
-import numpy as np
 from lenstronomy.Util import util
+from lenstronomy.LightModel.light_model import LightModel
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy.testing as npt
+import numpy as np
 import os
 import astropy.io.fits as pyfits
 
@@ -135,7 +136,6 @@ def test_fit_centroid_pso():
 
 
 def test_one_step_psf_estimation():
-    from lenstronomy.LightModel.light_model import LightModel
     numpix = 21
     n_c = (numpix - 1) / 2
     x_grid, y_grid = util.make_grid(numPix=21, deltapix=1, left_lower=True)
@@ -315,3 +315,17 @@ def test_combine_psf():
                              stacking_option='mean', symmetry=1, combine_with_old=False)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
+
+
+def test_luminosity_centring():
+    gauss = LightModel(['GAUSSIAN'])
+    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1., left_lower=False)
+    kwargs_guess = [{'amp': 1, 'sigma': 1.2, 'center_x': -0.5, 'center_y': 0.5}]
+    flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_guess)
+    star = util.array2image(flux_guess)
+
+    star_shifted = psfr.luminosity_centring(star)
+    x_grid, y_grid = util.array2image(x_grid), util.array2image(y_grid)
+    x_c, y_c = np.sum(star_shifted * x_grid) / np.sum(star_shifted), np.sum(star_shifted * y_grid) / np.sum(star_shifted)
+    npt.assert_almost_equal(x_c, 0, decimal=5)
+    npt.assert_almost_equal(y_c, 0, decimal=5)

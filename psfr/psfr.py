@@ -325,6 +325,28 @@ def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
     return psf_shifted
 
 
+def luminosity_centring(star):
+    """
+    computes luminosity center and shifts star such that the luminosity is centered at the central pixel
+
+    Parameters
+    ----------
+    star : 2d numpy array with square odd number
+        cutout of a star
+
+    Returns
+    -------
+    star_shift : luminosity centered star
+    """
+    x_grid, y_grid = util.make_grid(numPix=len(star), deltapix=1, left_lower=False)
+    x_grid, y_grid = util.array2image(x_grid), util.array2image(y_grid)
+    x_c, y_c = np.sum(star * x_grid) / np.sum(star), np.sum(star * y_grid) / np.sum(star)
+    # c_ = (len(star) - 1) / 2
+    # x_s, y_s = 2 * c_ - y_c, 2 * c_ - x_c
+    star_shift = shift_psf(star, oversampling=1, shift=[-x_c, -y_c], degrade=False, n_pix_star=len(star))
+    return star_shift
+
+
 def base_stacking(star_list, mask_list):
     """
     Basic stacking of stars in luminosity-weighted and mask-excluded regime.
@@ -348,7 +370,8 @@ def base_stacking(star_list, mask_list):
     weight_map = np.zeros_like(star_list[0])
 
     for i, star in enumerate(star_list):
-        star_stack_base += star * mask_list[i]
+        star_shift = luminosity_centring(star)
+        star_stack_base += star_shift * mask_list[i]
         weight_map += mask_list[i] * np.sum(star)
 
     # code can't handle situations where there is never a non-zero pixel
