@@ -79,7 +79,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     animation_options.update(kwargs_animate)
     # define base stacking without shift offset shifts
     # stacking with mask weight
-    star_stack_base = base_stacking(star_list, mask_list)
+    star_stack_base = base_stacking(star_list, mask_list, symmetry=4)
     star_stack_base /= np.sum(star_stack_base)
 
     # estimate center offsets based on base stacking PSF estimate
@@ -347,7 +347,7 @@ def luminosity_centring(star):
     return star_shift
 
 
-def base_stacking(star_list, mask_list):
+def base_stacking(star_list, mask_list, symmetry=1):
     """
     Basic stacking of stars in luminosity-weighted and mask-excluded regime.
     The method ignores sub-pixel off-centering of individual stars nor does it provide an oversampled solution.
@@ -360,6 +360,8 @@ def base_stacking(star_list, mask_list):
     mask_list : list of 2d boolean or integer arrays, same shape as star_list
         list of masks for each individual star's pixel to be included in the fit or not.
         0 means excluded, 1 means included
+    symmetry: integer >= 1
+        imposed symmetry of PSF estimate
 
     Returns
     -------
@@ -368,11 +370,14 @@ def base_stacking(star_list, mask_list):
     """
     star_stack_base = np.zeros_like(star_list[0])
     weight_map = np.zeros_like(star_list[0])
-
+    angle = 360. / symmetry
     for i, star in enumerate(star_list):
-        star_shift = luminosity_centring(star)
-        star_stack_base += star_shift * mask_list[i]
-        weight_map += mask_list[i] * np.sum(star)
+        for k in range(symmetry):
+            star_shift = luminosity_centring(star)
+            star_rotated = image_util.rotateImage(star_shift, angle * k)
+            mask_rotated = image_util.rotateImage(mask_list[i], angle * k)
+            star_stack_base += star_rotated * mask_rotated
+            weight_map += mask_rotated * np.sum(star)
 
     # code can't handle situations where there is never a non-zero pixel
     weight_map[weight_map == 0] = 1e-12
