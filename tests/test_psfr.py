@@ -353,6 +353,7 @@ def test_psf_error_map():
                                    oversampling=1)
     npt.assert_almost_equal(error_map, 0, decimal=2)
 
+    # this tests that if the star-to-star variation is below the noise level, the psf error map should be zero
     error_map = psfr.psf_error_map(star_list, psf_kernel, center_list, mask_list=mask_list, error_map_list=error_map_list,
                                    oversampling=1)
     npt.assert_almost_equal(error_map, 0, decimal=5)
