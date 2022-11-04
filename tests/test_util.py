@@ -99,3 +99,17 @@ def test_regular2oversampled_inverse():
 def test_jwst_example_stars():
     star_list_jwst = util.jwst_example_stars()
     assert len(star_list_jwst) == 5
+
+
+def test_median_with_mask():
+    mask_list = []
+    data_list = []
+    for i in range(5):
+        mask = np.random.randint(2, size=(3, 3))
+        data = np.ones((3, 3))
+        data[mask == 0] = 2
+        mask_list.append(mask)
+        data_list.append(data)
+    median_stack = util.median_with_mask(np.array(data_list), np.array(mask_list))
+    npt.assert_almost_equal(median_stack, np.ones((3, 3)))
+

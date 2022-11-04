@@ -5,7 +5,7 @@ from scipy import ndimage
 import matplotlib.pylab as plt
 import matplotlib.animation as animation
 from lenstronomy.Util import util, kernel_util, image_util
-from psfr.util import regular2oversampled, oversampled2regular
+from psfr.util import regular2oversampled, oversampled2regular, median_with_mask
 from psfr import mask_util
 from psfr import verbose_util
 
@@ -285,6 +285,74 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
                              weight_list=weights_psf_combined, **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
+
+
+def psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_list=None, oversampling=1):
+    """
+    computes the excess variance in the normalized residuals.
+    This quantity can be interpreted as a linearly scaled variance term proportional to the flux of the PSF
+    point source variance (i, j) = error_map(i, j) * <integrated point source flux>
+
+    Parameters
+    ----------
+    star_list: list of numpy arrays (2D) of stars. Odd square axis shape.
+        Cutout stars from images with approximately centered on the center pixel. All stars need the same cutout size.
+    psf_kernel : 2d numpy array with square odd axis normalized to sum = 1
+        PSF model in the oversampled resolution prior to this iteration step
+    center_list : list of 2d floats
+        list of astrometric centers relative to the center pixel of the individual stars
+    mask_list : list of 2d boolean or integer arrays, same shape as star_list
+        list of masks for each individual star's pixel to be included in the fit or not.
+        0 means excluded, 1 means included
+    oversampling : integer >=1
+        higher-resolution PSF reconstruction and return
+    error_map_list : None, or list of 2d numpy array, same size as data
+        Variance in the uncorrelated uncertainties in the data for individual pixels.
+        If not set, assumes equal variances for all pixels.
+
+    Returns
+    -------
+    psf_error_map : 2d numpy array of the size of the pixel grid
+
+
+    """
+    # creating oversampled mask
+    if mask_list is None:
+        mask_list_ = []
+        for i, star in enumerate(star_list):
+            mask_list_.append(np.ones_like(star))
+    else:
+        mask_list_ = mask_list
+    if error_map_list is None:
+        error_map_list = [None] * len(star_list)
+    norm_residual_list = np.zeros((len(star_list), len(star_list[0]), len(star_list[0])))
+
+    for i, star in enumerate(star_list):
+        center = center_list[i]
+        # shift PSF guess to estimated position of star
+        # shift PSF to position pre-determined to be the center of the point source, and degrade it to the image
+        psf_shifted = shift_psf(psf_kernel, oversampling, shift=center, degrade=False, n_pix_star=len(star))
+
+        # make data degraded version
+        psf_shifted_data = oversampled2regular(psf_shifted, oversampling=oversampling)
+        # make sure size is the same as the data and normalized to sum = 1
+        psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
+        # linear inversion in 1d
+        amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list_[i])
+        residuals = np.abs(star - amp * psf_shifted_data) * mask_list_[i]
+        # subtract expected noise level
+        if error_map_list[i] is not None:
+            residuals -= np.sqrt(error_map_list[i])
+        # make sure absolute residuals are none-negative
+        residuals[residuals < 0] = 0
+        # estimate relative error per star
+        residuals /= amp
+        norm_residual_list[i, :, :] = residuals ** 2
+    error_map_psf = median_with_mask(norm_residual_list, mask_list_)
+    # error_map_psf[psf_kernel > 0] /= psf_kernel[psf_kernel > 0] ** 2
+    error_map_psf = np.nan_to_num(error_map_psf)
+    error_map_psf[error_map_psf > 1] = 1  # cap on error to be the same
+    return error_map_psf
 
 
 def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
@@ -588,19 +656,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
             kernel_new = np.median(kernel_list, axis=0)
         else:
             # ignore masked pixels instead of over-writing with old one
-            mask_list = np.array(mask_list)
-            x_dim, y_dim = kernel_list[0].shape
-            kernel_new = np.zeros((x_dim, y_dim))
-            for i in range(x_dim):
-                for j in range(y_dim):
-                    # slice through same pixels in all kernels
-                    pixels = kernel_list[:, i, j]
-                    # slice through same pixels in all masks
-                    masks = mask_list[:, i, j]
-                    # select only those entries that are not masked
-                    pixel_select = pixels[masks > 0]
-                    # compute median of those values only
-                    kernel_new[i, j] = np.median(pixel_select)
+            kernel_new = median_with_mask(kernel_list, mask_list)
     else:
         raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported."
                          % stacking_option)

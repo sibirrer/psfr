@@ -329,3 +329,25 @@ def test_luminosity_centring():
     x_c, y_c = np.sum(star_shifted * x_grid) / np.sum(star_shifted), np.sum(star_shifted * y_grid) / np.sum(star_shifted)
     npt.assert_almost_equal(x_c, 0, decimal=5)
     npt.assert_almost_equal(y_c, 0, decimal=5)
+
+
+def test_psf_error_map():
+    from lenstronomy.LightModel.light_model import LightModel
+    numpix = 11
+
+    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
+    gauss = LightModel(['GAUSSIAN'])
+    kwargs_model = [{'amp': 1, 'sigma': 1.5, 'center_x': 0, 'center_y': 0}]
+    flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
+    psf_kernel = util.array2image(flux_true)
+
+    star_list, center_list, error_map_list = [], [], []
+    for i in range(100):
+        star = psf_kernel * i + np.random.randn(numpix, numpix)
+        center_list.append([0, 0])
+        star_list.append(star)
+        error_map_list.append(np.ones_like(star))
+    star_list = np.array(star_list)
+    error_map = psfr.psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_list=None,
+                                   oversampling=1)
+    npt.assert_almost_equal(error_map, 0 , decimal=2)
