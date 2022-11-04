@@ -341,13 +341,18 @@ def test_psf_error_map():
     flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
     psf_kernel = util.array2image(flux_true)
 
-    star_list, center_list, error_map_list = [], [], []
+    star_list, center_list, error_map_list, mask_list = [], [], [], []
     for i in range(100):
         star = psf_kernel * i + np.random.randn(numpix, numpix)
         center_list.append([0, 0])
         star_list.append(star)
-        error_map_list.append(np.ones_like(star))
+        error_map_list.append(np.ones_like(star) * 5)
+        mask_list.append(np.ones_like(star))
     star_list = np.array(star_list)
     error_map = psfr.psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_list=None,
                                    oversampling=1)
-    npt.assert_almost_equal(error_map, 0 , decimal=2)
+    npt.assert_almost_equal(error_map, 0, decimal=2)
+
+    error_map = psfr.psf_error_map(star_list, psf_kernel, center_list, mask_list=mask_list, error_map_list=error_map_list,
+                                   oversampling=1)
+    npt.assert_almost_equal(error_map, 0, decimal=5)
