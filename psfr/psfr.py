@@ -66,7 +66,8 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
 
     """
     # update the mask according to settings
-    mask_list, use_mask = mask_util.mask_configuration(star_list, mask_list=mask_list, saturation_limit=saturation_limit)
+    mask_list, use_mask = mask_util.mask_configuration(star_list, mask_list=mask_list,
+                                                       saturation_limit=saturation_limit)
     if kwargs_one_step is None:
         kwargs_one_step = {}
     if kwargs_psf_stacking is None:
@@ -108,8 +109,9 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     else:
         mask_list_one_step = None
     for j in range(num_iteration):
-        psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list_one_step, error_map_list=error_map_list,
-                                          oversampling=oversampling, **kwargs_psf_stacking, **kwargs_one_step)
+        psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list_one_step,
+                                          error_map_list=error_map_list, oversampling=oversampling,
+                                          **kwargs_psf_stacking, **kwargs_one_step)
         if j % n_recenter == 0 and j != 0:
             center_list = []
             for i, star in enumerate(star_list):
@@ -291,7 +293,7 @@ def psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_
     """
     computes the excess variance in the normalized residuals.
     This quantity can be interpreted as a linearly scaled variance term proportional to the flux of the PSF
-    point source variance (i, j) = error_map(i, j) * <integrated point source flux>
+    <point source variance>(i, j) = error_map(i, j) * <integrated point source flux>
 
     Parameters
     ----------
@@ -313,6 +315,8 @@ def psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_
     Returns
     -------
     psf_error_map : 2d numpy array of the size of the pixel grid
+        variance in the normalized PSF such that
+        <point source variance>(i, j) = error_map(i, j) * <integrated point source flux>
 
 
     """
