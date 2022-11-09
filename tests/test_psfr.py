@@ -301,17 +301,17 @@ def test_combine_psf():
         kernel_list_input.append(np.random.randn(nx, ny) + kernel)
     diff_input = np.sum((kernel_list_input[0] - kernel) ** 2)
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=weight_list, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=weight_list, factor=1.,
                              stacking_option='median', symmetry=1, combine_with_old=True)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=weight_list, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=weight_list, factor=1.,
                              stacking_option='median_weight', symmetry=1, combine_with_old=False)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=None, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=None, factor=1.,
                              stacking_option='mean', symmetry=1, combine_with_old=False)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output

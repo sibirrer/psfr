@@ -43,7 +43,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     psf_initial_guess : None or 2d numpy array with square odd axis
         Initial guess PSF on oversampled scale. If not provided, estimates an initial guess with the stacked stars.
     kwargs_animate : keyword arguments for animation settings
-        Settings to display animation of interative process of psf reconstuction. The argument is organized as:
+        Settings to display animation of interactive process of psf reconstruction. The argument is organized as:
             {animate: bool, output_dir: str (directory to save animation in),
             duration: int (length of animation in milliseconds)}
     kwargs_psf_stacking: keyword argument list of arguments going into combine_psf()
@@ -73,7 +73,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     if kwargs_psf_stacking is None:
         kwargs_psf_stacking = {}
     if error_map_list is None:
-        error_map_list = [None] * len(star_list)
+        error_map_list = [np.ones_like(star_list[0])] * len(star_list)
 
     # update default options for animations
     animation_options = {'animate': False, 'output_dir': 'stacked_psf_animation.gif', 'duration': 5000}
@@ -81,6 +81,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     # define base stacking without shift offset shifts
     # stacking with mask weight
     star_stack_base = base_stacking(star_list, mask_list, symmetry=4)
+    star_stack_base[star_stack_base < 0] = 0
     star_stack_base /= np.sum(star_stack_base)
 
     # estimate center offsets based on base stacking PSF estimate
@@ -197,13 +198,14 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
             mask_ = regular2oversampled(mask, oversampling=oversampling)
             mask_list_oversampled.append(mask_)
     if error_map_list is None:
-        error_map_list = [None] * len(star_list)
+        error_map_list = [np.ones_like(star_list[0])] * len(star_list)
+    error_map_list_psf = []  # list of variances in the centroid position and super-sampled PSF estimate
     psf_list_new = []
     weight_list = []
     for i, star in enumerate(star_list):
         center = center_list[i]
         # shift PSF guess to estimated position of star
-        # shift PSF to position pre-determined to be the center of the point source, and degrate it to the image
+        # shift PSF to position pre-determined to be the center of the point source, and degrade it to the image
         psf_shifted = shift_psf(psf_guess, oversampling, shift=center_list[i], degrade=False, n_pix_star=len(star))
 
         # make data degraded version
@@ -213,6 +215,10 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
         # linear inversion in 1d
         amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list_[i])
         weight_list.append(amp)
+
+        # shift error_map_list to PSF position
+        error_map_shifted = ndimage.shift(error_map_list[i], shift=[-center[1], -center[0]], order=0)
+        error_map_list_psf.append(regular2oversampled(error_map_shifted, oversampling=oversampling))
 
         # compute residuals on data
         if oversampled_residual_deshifting:  # directly in oversampled space
@@ -263,11 +269,12 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
         psf_size = len(psf_guess)
         residuals_shifted = image_util.cut_edges(residuals_shifted, psf_size)
         # normalize residuals
-        correction = residuals_shifted - np.mean(residuals_shifted)
+        correction = residuals_shifted  # - np.mean(residuals_shifted)
         psf_new = psf_guess + correction
-        # not really needed
+        # TODO: for negative pixels, apply an average correction with its neighboring pixels
         psf_new[psf_new < 0] = 0
-        psf_new /= np.sum(psf_new)
+        # re-normalization can bias the PSF for low S/N ratios
+        # psf_new /= np.sum(psf_new)
         if verbose:
             fig = verbose_util.verbose_one_step(star, psf_shifted, psf_shifted_data, residuals, residuals_shifted,
                                                 correction, psf_new)
@@ -283,8 +290,10 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
     weights_psf_combined = np.sqrt(weight_list)
 
     # TODO: None as input for mask_list if mask are irrelevant
+    # TODO: add error variance map weights (including shifted)
     kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list_oversampled,
-                             weight_list=weights_psf_combined, **psf_stacking_options)
+                             amplitude_list=weights_psf_combined, error_map_list=error_map_list_psf,
+                             **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
 
@@ -574,8 +583,8 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         raise ValueError('optimization type %s is not supported. Please use Nelder-Mead or PSO' % optimizer_type)
 
 
-def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, factor=1., stacking_option='median',
-                symmetry=1, combine_with_old=False):
+def combine_psf(kernel_list_new, kernel_old, mask_list=None, amplitude_list=None, factor=1., stacking_option='median',
+                symmetry=1, combine_with_old=False, error_map_list=None):
     """
     updates psf estimate based on old kernel and several new estimates
 
@@ -587,8 +596,8 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         old PSF kernel
     mask_list : None or list of booleans of shape of kernel_list_new
         masks used in the 'kernel_list_new' determination. These regions will not be considered in the combined PSF.
-    weight_list : None or list of floats with positive semi-definite values
-        weights of the different new kernel estimates (i.e. brightness of the stars, etc)
+    amplitude_list : None or list of floats with positive semi-definite values
+        pre-normalized amplitude of the different new kernel estimates (i.e. brightness of the stars, etc)
     factor : weight of updated estimate based on new and old estimate, factor=1 means new estimate,
         factor=0 means old estimate
     stacking_option : string
@@ -597,6 +606,9 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         imposed symmetry of PSF estimate
     combine_with_old : boolean
         if True, adds the previous PSF as one of the proposals for the new PSFs
+    error_map_list : None, or list of 2d numpy array, same size as data
+        Variance in the uncorrelated uncertainties in the data for individual pixels.
+        If not set, assumes equal variances for all pixels.
 
     Returns
     -------
@@ -605,8 +617,10 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
 
     n = int(len(kernel_list_new) * symmetry)
 
-    if weight_list is None:
-        weight_list = np.ones(len(kernel_list_new))
+    if amplitude_list is None:
+        amplitude_list = np.ones(len(kernel_list_new))
+    if error_map_list is None:
+        error_map_list = [np.ones_like(kernel_old)] * len(kernel_list_new)
 
     angle = 360. / symmetry
     kernelsize = len(kernel_old)
@@ -623,8 +637,9 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
             kernel_rotated = image_util.rotateImage(kernel_new, angle * k)
             kernel_norm = kernel_util.kernel_norm(kernel_rotated)
             kernel_list[i, :, :] = kernel_norm
-            # weight according to surface brightness and mask
-            weights[i, :, :] = weight_list[j] * kernel_old * mask
+            # weight according to surface brightness, inverse variance map, and mask
+            error_map_list[j][error_map_list[j] < 10 ** (-10)] = 10 ** (-10)
+            weights[i, :, :] = amplitude_list[j] * 1 / error_map_list[j] * mask
             i += 1
 
     if combine_with_old is True:
@@ -632,6 +647,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         for i in range(symmetry):
             kernel_old_rotated[i, :, :] = kernel_old / np.sum(kernel_old)
             kernel_list = np.append(kernel_list, kernel_old_rotated, axis=0)
+            # TODO: this next line is ambiguous about what weight being used for the old kernel estimate
             weights = np.append(weights, kernel_old)
 
     # TODO: outlier detection?
@@ -665,7 +681,7 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, weight_list=None, f
         raise ValueError(" stack_option must be 'median', 'median_weight' or 'mean', %s is not supported."
                          % stacking_option)
     kernel_new = np.nan_to_num(kernel_new)
-    kernel_new[kernel_new < 0] = 0
+    # kernel_new[kernel_new < 0] = 0
     kernel_new = kernel_util.kernel_norm(kernel_new)
     kernel_return = factor * kernel_new + (1. - factor) * kernel_old
     return kernel_return
