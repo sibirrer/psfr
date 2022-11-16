@@ -102,6 +102,7 @@ def test_jwst_example_stars():
 
 
 def test_median_with_mask():
+    np.random.seed(2)
     mask_list = []
     data_list = []
     for i in range(5):

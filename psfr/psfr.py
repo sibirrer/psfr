@@ -12,8 +12,8 @@ from psfr import verbose_util
 from lenstronomy.Sampling.Samplers.pso import ParticleSwarmOptimizer
 
 
-def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, saturation_limit=None, num_iteration=5,
-              n_recenter=10,
+def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, saturation_limit=None, num_iteration=20,
+              n_recenter=5,
               verbose=False, kwargs_one_step=None, psf_initial_guess=None, kwargs_psf_stacking=None,
               centroid_optimizer='Nelder-Mead', **kwargs_animate):
     """
@@ -149,7 +149,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
 
 
 def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, error_map_list=None, oversampling=1,
-                          step_factor=0.2, oversampled_residual_deshifting=False, deshift_order=1, verbose=False,
+                          step_factor=0.2, oversampled_residual_deshifting=True, deshift_order=1, verbose=False,
                           **kwargs_psf_stacking):
     """
 
@@ -198,10 +198,10 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
             mask_ = regular2oversampled(mask, oversampling=oversampling)
             mask_list_oversampled.append(mask_)
     if error_map_list is None:
-        error_map_list = [np.ones_like(star_list[0])] * len(star_list)
+        error_map_list = [np.ones_like(star_list[0]) * 10.0**(-50)] * len(star_list)  # * 10.0**(-50)
     error_map_list_psf = []  # list of variances in the centroid position and super-sampled PSF estimate
     psf_list_new = []
-    weight_list = []
+    amplitude_list = []
     for i, star in enumerate(star_list):
         center = center_list[i]
         # shift PSF guess to estimated position of star
@@ -214,11 +214,13 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
         psf_shifted_data = kernel_util.cut_psf(psf_shifted_data, len(star))
         # linear inversion in 1d
         amp = _linear_amplitude(star, psf_shifted_data, variance=error_map_list[i], mask=mask_list_[i])
-        weight_list.append(amp)
+        amplitude_list.append(amp)
 
         # shift error_map_list to PSF position
-        error_map_shifted = ndimage.shift(error_map_list[i], shift=[-center[1], -center[0]], order=0)
-        error_map_list_psf.append(regular2oversampled(error_map_shifted, oversampling=oversampling))
+        error_map_shifted = ndimage.shift(error_map_list[i], shift=[-center[1], -center[0]], order=deshift_order,
+                                          mode='constant', cval=0)
+        error_map_shifted_oversampled = regular2oversampled(error_map_shifted, oversampling=oversampling)
+        error_map_list_psf.append(error_map_shifted_oversampled)
 
         # compute residuals on data
         if oversampled_residual_deshifting:  # directly in oversampled space
@@ -269,10 +271,13 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
         psf_size = len(psf_guess)
         residuals_shifted = image_util.cut_edges(residuals_shifted, psf_size)
         # normalize residuals
-        correction = residuals_shifted  # - np.mean(residuals_shifted)
+        # remove noise from corrections
+        # TODO: normalization correction
+        # TODO: make sure without error_map that no correction is performed
+        correction = residuals_shifted  # - np.sign(residuals_shifted) * np.minimum(np.sqrt(error_map_shifted_oversampled)/amp, np.abs(residuals_shifted)) # - np.mean(residuals_shifted)
         psf_new = psf_guess + correction
         # TODO: for negative pixels, apply an average correction with its neighboring pixels
-        psf_new[psf_new < 0] = 0
+        # psf_new[psf_new < 0] = 0
         # re-normalization can bias the PSF for low S/N ratios
         # psf_new /= np.sum(psf_new)
         if verbose:
@@ -284,15 +289,12 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
     # stack all residuals and update the psf guess
     psf_stacking_options = {'stacking_option': 'median', 'symmetry': 1}
     psf_stacking_options.update(kwargs_psf_stacking)
-    weight_list = np.array(weight_list)
-    weight_list[weight_list < 0] = 0
-    # the weights are supposed to be Poisson noise dominated, which scales as the square root of the brightness
-    weights_psf_combined = np.sqrt(weight_list)
+    amplitude_list = np.array(amplitude_list)
+    amplitude_list[amplitude_list < 0] = 0
 
     # TODO: None as input for mask_list if mask are irrelevant
-    # TODO: add error variance map weights (including shifted)
     kernel_new = combine_psf(psf_list_new, psf_guess, factor=step_factor, mask_list=mask_list_oversampled,
-                             amplitude_list=weights_psf_combined, error_map_list=error_map_list_psf,
+                             amplitude_list=amplitude_list, error_map_list=error_map_list_psf,
                              **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
     return kernel_new
@@ -368,7 +370,7 @@ def psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_
     return error_map_psf
 
 
-def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
+def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None, order=1):
     """
     shift PSF to the star position. Optionally degrades to the image resolution afterwards
 
@@ -384,6 +386,8 @@ def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
         if True degrades the shifted PSF to the data resolution and cuts the resulting size to n_pix_star
     n_pix_star : odd integer
         size per axis of the data, used when degrading the shifted {SF
+    order : integer >=0
+        polynomial order of the ndimage.shift interpolation
 
     Returns
     -------
@@ -396,7 +400,7 @@ def shift_psf(psf_center, oversampling, shift, degrade=True, n_pix_star=None):
     # shift psf
     # TODO: what is optimal interpolation in the shift, or doing it in Fourier space instead?
     # Partial answer: interpolation in order=1 is better than order=0 (order=2 is even better for Gaussian PSF's)
-    psf_shifted = ndimage.shift(psf_center, shift=[shift_y, shift_x], order=2)
+    psf_shifted = ndimage.shift(psf_center, shift=[shift_y, shift_x], order=order)
 
     # resize to pixel scale (making sure the grid definition with the center in the central pixel is preserved)
     if degrade is True:
@@ -552,7 +556,7 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         return chi2
 
     init = np.array([0, 0])
-    bounds = ((-5, 5), (-5, 5))
+    bounds = ((-10, 10), (-10, 10))
     if mask is None:
         mask = np.ones_like(data)
     if variance is None:

@@ -42,7 +42,7 @@ def test_shift_psf():
     psf_shifted_true = kernel_util.degrade_kernel(psf_shifted_super_true, degrading_factor=oversampling)
     psf_shifted_true = kernel_util.cut_psf(psf_shifted_true, numpix)
 
-    psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=numpix)
+    psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=numpix, order=2)
 
     if False:
         f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
@@ -315,6 +315,20 @@ def test_combine_psf():
                              stacking_option='mean', symmetry=1, combine_with_old=False)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
+
+    # here with an uniform error map = 1
+    error_map_list = [np.ones_like(kernel)] * len(kernel_list_input)
+    kernel_new_error_map = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=None, factor=1.,
+                                       stacking_option='mean', symmetry=1, combine_with_old=False,
+                                       error_map_list=error_map_list)
+    npt.assert_almost_equal(kernel_new_error_map, kernel_new)
+
+    # here with an uniform error map != 1
+    error_map_list = [np.ones_like(kernel) * 10**(-10)] * len(kernel_list_input)
+    kernel_new_error_map = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=None, factor=1.,
+                                       stacking_option='mean', symmetry=1, combine_with_old=False,
+                                       error_map_list=error_map_list)
+    npt.assert_almost_equal(kernel_new_error_map, kernel_new)
 
 
 def test_luminosity_centring():
