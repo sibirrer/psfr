@@ -633,17 +633,18 @@ def combine_psf(kernel_list_new, kernel_old, mask_list=None, amplitude_list=None
     i = 0
     for j, kernel_new in enumerate(kernel_list_new):
         if mask_list is None:
-            mask = 1
+            mask = np.ones_like(kernel_new, dtype='int')
         else:
-            mask = mask_list[i]
-
+            mask = mask_list[j]
+        error_map_list[j][error_map_list[j] < 10 ** (-10)] = 10 ** (-10)
         for k in range(symmetry):
             kernel_rotated = image_util.rotateImage(kernel_new, angle * k)
+            error_map = image_util.rotateImage(error_map_list[j], angle * k)
+            mask_rot = image_util.rotateImage(mask, angle * k)
             kernel_norm = kernel_util.kernel_norm(kernel_rotated)
             kernel_list[i, :, :] = kernel_norm
             # weight according to surface brightness, inverse variance map, and mask
-            error_map_list[j][error_map_list[j] < 10 ** (-10)] = 10 ** (-10)
-            weights[i, :, :] = amplitude_list[j] * 1 / error_map_list[j] * mask
+            weights[i, :, :] = amplitude_list[j] * 1 / error_map * mask_rot
             i += 1
 
     if combine_with_old is True:
