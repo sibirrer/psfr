@@ -296,18 +296,25 @@ def test_combine_psf():
     kernel = pyfits.getdata(psf_filename)
     nx, ny = np.shape(kernel)
     kernel_list_input = []
-    weight_list = np.ones(10)
+    amplitude_list = np.ones(10)
     for i in range(10):
         kernel_list_input.append(np.random.randn(nx, ny) + kernel)
     diff_input = np.sum((kernel_list_input[0] - kernel) ** 2)
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=weight_list, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=amplitude_list, factor=1.,
                              stacking_option='median', symmetry=1, combine_with_old=True)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=weight_list, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=amplitude_list, factor=1.,
                              stacking_option='median_weight', symmetry=1, combine_with_old=False)
+    diff_output = np.sum((kernel_new - kernel) ** 2)
+    assert diff_input > diff_output
+    mask_list = np.ones_like(np.array(kernel_list_input), dtype='int')
+    error_map_list = np.ones_like(np.array(kernel_list_input))
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=mask_list, amplitude_list=amplitude_list, factor=1.,
+                             stacking_option='median_weight', symmetry=2, combine_with_old=False,
+                             error_map_list=error_map_list)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
 
@@ -343,6 +350,26 @@ def test_luminosity_centring():
     x_c, y_c = np.sum(star_shifted * x_grid) / np.sum(star_shifted), np.sum(star_shifted * y_grid) / np.sum(star_shifted)
     npt.assert_almost_equal(x_c, 0, decimal=5)
     npt.assert_almost_equal(y_c, 0, decimal=5)
+
+
+def test_centroid_fit():
+    gauss = LightModel(['GAUSSIAN'])
+    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1., left_lower=False)
+    kwargs_data = [{'amp': 1, 'sigma': 1.2, 'center_x': -0.5, 'center_y': 0.5}]
+    flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_data)
+    data = util.array2image(flux_guess)
+
+    kwargs_model = [{'amp': 1, 'sigma': 1.2, 'center_x': 0, 'center_y': 0}]
+    flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
+    model = util.array2image(flux_guess)
+    mask = np.ones_like(model, dtype='int')
+    variance = np.ones_like(model, dtype='float')
+
+    center_shift = psfr.centroid_fit(data, model, mask=mask, variance=variance, oversampling=1, optimizer_type='Nelder-Mead')
+    npt.assert_almost_equal(center_shift, [-0.5, 0.5], decimal=3)
+
+    center_shift = psfr.centroid_fit(data, model, mask=mask, variance=variance, oversampling=1, optimizer_type='PSO')
+    npt.assert_almost_equal(center_shift, [-0.5, 0.5], decimal=3)
 
 
 def test_psf_error_map():
