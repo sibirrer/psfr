@@ -576,7 +576,7 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         pool = None
         pso = ParticleSwarmOptimizer(_minimize,
                                      lowerLims, upperLims, n_particles,
-                                     pool=pool, args=[data, model, variance, mask],
+                                     pool=pool, args=[data, model, mask, variance],
                                      kwargs={'oversampling': oversampling,
                                              'negative': -1})
 
