@@ -19,11 +19,11 @@ authors:
     orcid: 0000-0002-8434-880X
     affiliation: 6 
 affiliations:
-  - name: Kavli Institute for Particle Astrophysics and Cosmology and Department of Physics, Stanford University, Stanford, CA 94305, USA
-    index: 1
-  - name: SLAC National Accelerator Laboratory, Menlo Park, CA, 94025, USA
-    index: 2
   - name: Department of Physics and Astronomy, Stony Brook University, Stony Brook, NY 11794, USA
+    index: 1
+  - name: Kavli Institute for Particle Astrophysics and Cosmology and Department of Physics, Stanford University, Stanford, CA 94305, USA
+    index: 2
+  - name: SLAC National Accelerator Laboratory, Menlo Park, CA, 94025, USA
     index: 3
   - name: St Paul's High School, Lonsdale Rd, London SW13 9JT
     index: 4
