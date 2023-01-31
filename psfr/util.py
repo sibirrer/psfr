@@ -1,5 +1,6 @@
 from scipy import ndimage
 import os
+import numpy as np
 import astropy.io.fits as pyfits
 from lenstronomy.Util import kernel_util, image_util
 import psfr
@@ -103,3 +104,34 @@ def jwst_example_stars():
         star_list.append(star)
     return star_list
 
+
+def median_with_mask(data_list, mask_list):
+    """
+    pixel-wise median across the different data sets ignoring the masked pixels
+
+    Parameters
+    ----------
+    data_list : (l x nx x ny) numpy array
+        set of l equally sized 2d data sets
+    mask_list : (l x nx x ny) numpy array of zeros or ones
+        masks applied with 1 = included in the median and 0 = excluded
+
+    Returns
+    -------
+    median_mask : (nx x ny) numpy array
+        pixel-wise median across the 'l' different data sets ignoring the masked pixels
+    """
+    mask_list = np.array(mask_list)
+    x_dim, y_dim = data_list[0].shape
+    median_mask = np.zeros((x_dim, y_dim))
+    for i in range(x_dim):
+        for j in range(y_dim):
+            # slice through same pixels in all kernels
+            pixels = data_list[:, i, j]
+            # slice through same pixels in all masks
+            masks = mask_list[:, i, j]
+            # select only those entries that are not masked
+            pixel_select = pixels[masks > 0]
+            # compute median of those values only
+            median_mask[i, j] = np.median(pixel_select)
+    return median_mask

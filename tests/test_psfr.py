@@ -4,11 +4,12 @@
 
 from psfr import psfr
 from lenstronomy.Util import kernel_util
-import numpy.testing as npt
-import numpy as np
 from lenstronomy.Util import util
+from lenstronomy.LightModel.light_model import LightModel
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy.testing as npt
+import numpy as np
 import os
 import astropy.io.fits as pyfits
 
@@ -41,7 +42,7 @@ def test_shift_psf():
     psf_shifted_true = kernel_util.degrade_kernel(psf_shifted_super_true, degrading_factor=oversampling)
     psf_shifted_true = kernel_util.cut_psf(psf_shifted_true, numpix)
 
-    psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=numpix)
+    psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=numpix, order=2)
 
     if False:
         f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
@@ -135,7 +136,6 @@ def test_fit_centroid_pso():
 
 
 def test_one_step_psf_estimation():
-    from lenstronomy.LightModel.light_model import LightModel
     numpix = 21
     n_c = (numpix - 1) / 2
     x_grid, y_grid = util.make_grid(numPix=21, deltapix=1, left_lower=True)
@@ -230,7 +230,8 @@ def test_saturation_limit():
                                                                                    oversampling=oversampling,
                                                                                    saturation_limit=saturation_limit,
                                                                                    num_iteration=10,
-                                                                                   n_recenter=20)
+                                                                                   n_recenter=20,
+                                                                                   centroid_optimizer='Nelder-Mead')
     # psf reconstructed without a saturation limit
     psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling,
                                                                        saturation_limit=None, num_iteration=10,
@@ -295,22 +296,105 @@ def test_combine_psf():
     kernel = pyfits.getdata(psf_filename)
     nx, ny = np.shape(kernel)
     kernel_list_input = []
-    weight_list = np.ones(10)
+    amplitude_list = np.ones(10)
     for i in range(10):
         kernel_list_input.append(np.random.randn(nx, ny) + kernel)
     diff_input = np.sum((kernel_list_input[0] - kernel) ** 2)
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=weight_list, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=amplitude_list, factor=1.,
                              stacking_option='median', symmetry=1, combine_with_old=True)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=weight_list, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=amplitude_list, factor=1.,
                              stacking_option='median_weight', symmetry=1, combine_with_old=False)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
+    mask_list = np.ones_like(np.array(kernel_list_input), dtype='int')
+    error_map_list = np.ones_like(np.array(kernel_list_input))
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=mask_list, amplitude_list=amplitude_list, factor=1.,
+                             stacking_option='median_weight', symmetry=2, combine_with_old=False,
+                             error_map_list=error_map_list)
+    diff_output = np.sum((kernel_new - kernel) ** 2)
+    assert diff_input > diff_output
 
-    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, weight_list=None, factor=1.,
+    kernel_new = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=None, factor=1.,
                              stacking_option='mean', symmetry=1, combine_with_old=False)
     diff_output = np.sum((kernel_new - kernel) ** 2)
     assert diff_input > diff_output
+
+    # here with an uniform error map = 1
+    error_map_list = [np.ones_like(kernel)] * len(kernel_list_input)
+    kernel_new_error_map = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=None, factor=1.,
+                                       stacking_option='mean', symmetry=1, combine_with_old=False,
+                                       error_map_list=error_map_list)
+    npt.assert_almost_equal(kernel_new_error_map, kernel_new)
+
+    # here with an uniform error map != 1
+    error_map_list = [np.ones_like(kernel) * 10**(-10)] * len(kernel_list_input)
+    kernel_new_error_map = combine_psf(kernel_list_input, kernel, mask_list=None, amplitude_list=None, factor=1.,
+                                       stacking_option='mean', symmetry=1, combine_with_old=False,
+                                       error_map_list=error_map_list)
+    npt.assert_almost_equal(kernel_new_error_map, kernel_new)
+
+
+def test_luminosity_centring():
+    gauss = LightModel(['GAUSSIAN'])
+    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1., left_lower=False)
+    kwargs_guess = [{'amp': 1, 'sigma': 1.2, 'center_x': -0.5, 'center_y': 0.5}]
+    flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_guess)
+    star = util.array2image(flux_guess)
+
+    star_shifted = psfr.luminosity_centring(star)
+    x_grid, y_grid = util.array2image(x_grid), util.array2image(y_grid)
+    x_c, y_c = np.sum(star_shifted * x_grid) / np.sum(star_shifted), np.sum(star_shifted * y_grid) / np.sum(star_shifted)
+    npt.assert_almost_equal(x_c, 0, decimal=5)
+    npt.assert_almost_equal(y_c, 0, decimal=5)
+
+
+def test_centroid_fit():
+    gauss = LightModel(['GAUSSIAN'])
+    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1., left_lower=False)
+    kwargs_data = [{'amp': 1, 'sigma': 1.2, 'center_x': -0.5, 'center_y': 0.5}]
+    flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_data)
+    data = util.array2image(flux_guess)
+
+    kwargs_model = [{'amp': 1, 'sigma': 1.2, 'center_x': 0, 'center_y': 0}]
+    flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
+    model = util.array2image(flux_guess)
+    mask = np.ones_like(model, dtype='int')
+    variance = np.ones_like(model, dtype='float')
+
+    center_shift = psfr.centroid_fit(data, model, mask=mask, variance=variance, oversampling=1, optimizer_type='Nelder-Mead')
+    npt.assert_almost_equal(center_shift, [-0.5, 0.5], decimal=3)
+
+    center_shift = psfr.centroid_fit(data, model, mask=mask, variance=variance, oversampling=1, optimizer_type='PSO')
+    npt.assert_almost_equal(center_shift, [-0.5, 0.5], decimal=3)
+
+
+def test_psf_error_map():
+    from lenstronomy.LightModel.light_model import LightModel
+    numpix = 11
+
+    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
+    gauss = LightModel(['GAUSSIAN'])
+    kwargs_model = [{'amp': 1, 'sigma': 1.5, 'center_x': 0, 'center_y': 0}]
+    flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
+    psf_kernel = util.array2image(flux_true)
+
+    star_list, center_list, error_map_list, mask_list = [], [], [], []
+    for i in range(100):
+        star = psf_kernel * i + np.random.randn(numpix, numpix)
+        center_list.append([0, 0])
+        star_list.append(star)
+        error_map_list.append(np.ones_like(star) * 5)
+        mask_list.append(np.ones_like(star))
+    star_list = np.array(star_list)
+    error_map = psfr.psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_list=None,
+                                   oversampling=1)
+    npt.assert_almost_equal(error_map, 0, decimal=2)
+
+    # this tests that if the star-to-star variation is below the noise level, the psf error map should be zero
+    error_map = psfr.psf_error_map(star_list, psf_kernel, center_list, mask_list=mask_list, error_map_list=error_map_list,
+                                   oversampling=1)
+    npt.assert_almost_equal(error_map, 0, decimal=5)
