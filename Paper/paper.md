@@ -112,6 +112,6 @@ Details and options for the different steps can be found in the documentation an
 
 # Acknowledgements
 
-We acknowledge support from ...
+SB was partially supported by the National Science Foundation through NSF AST-1716527.
 
 # References
