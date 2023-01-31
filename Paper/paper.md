@@ -28,9 +28,9 @@ affiliations:
   - name: St Paul's High School, Lonsdale Rd, London SW13 9JT
     index: 4
   - name: University of California Merced, Department of Physics 5200 North Lake Rd. Merced, CA 9534, USA
-    index 5
+    index: 5
   - name: Kavli Institute for the Physics and Mathematics of the Universe, The University of Tokyo, Kashiwa, Japan 277-8583
-    index 6
+    index: 6
 
 date: 01 October 2022
 codeRepository: https://github.com/sibirrer/psfr
