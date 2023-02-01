@@ -7,10 +7,9 @@ tags:
 authors:
   - name: Simon Birrer
     orcid: 0000-0003-3195-5507
-  - corresponding: true # (This is how to denote the corresponding author)
+    corresponding: true # (This is how to denote the corresponding author)
     affiliation: "1, 2, 3" # (Multiple affiliations must be quoted)
   - name: Vikram Bhamre
-    # orcid: 0000-0000-0000-0000
     affiliation: 4 
   - name: Anna Nierenberg
     orcid: 0000-0001-6809-2536
