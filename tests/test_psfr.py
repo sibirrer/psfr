@@ -163,7 +163,7 @@ def test_one_step_psf_estimation():
         star = util.array2image(flux_model)
         star_list.append(star)
 
-    psf_after = psfr.one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, error_map_list=None,
+    psf_after, amplitude_list= psfr.one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, error_map_list=None,
                                            step_factor=0.2)
     # psf_after should be a better guess of psf_true than psf_guess
     diff_after = np.sum((psf_after - psf_true) ** 2)
@@ -184,14 +184,14 @@ def test_one_step_psf_estimation():
     psf_true_super = util.array2image(flux_true_super)
     psf_true_super /= np.sum(psf_true_super)
 
-    psf_after_super = psfr.one_step_psf_estimate(star_list, psf_guess_super, center_list, mask_list=None,
+    psf_after_super, amplitude_list = psfr.one_step_psf_estimate(star_list, psf_guess_super, center_list, mask_list=None,
                                                  error_map_list=None, step_factor=0.2, oversampling=oversampling)
     diff_after = np.sum((psf_after_super - psf_true_super) ** 2)
     diff_before = np.sum((psf_guess_super - psf_true_super) ** 2)
     assert diff_after < diff_before
 
     # de-shifting in oversampled space (should be a bit lower quality but still better than initial guess)
-    psf_after_super = psfr.one_step_psf_estimate(star_list, psf_guess_super, center_list, mask_list=None,
+    psf_after_super, amplitude_list = psfr.one_step_psf_estimate(star_list, psf_guess_super, center_list, mask_list=None,
                                                  error_map_list=None, step_factor=0.2, oversampling=oversampling,
                                                  oversampled_residual_deshifting=True)
     diff_after = np.sum((psf_after_super - psf_true_super) ** 2)
@@ -226,14 +226,14 @@ def test_saturation_limit():
         star_list_webb.append(star)
 
     # psf reconstructed with a saturation limit
-    psf_psfr_super_sat, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb,
+    psf_psfr_super_sat, center_list_psfr_super_sat, mask_list_sat, amplitude_list_sat = psfr.stack_psf(star_list_webb,
                                                                                    oversampling=oversampling,
                                                                                    saturation_limit=saturation_limit,
                                                                                    num_iteration=10,
                                                                                    n_recenter=20,
                                                                                    centroid_optimizer='Nelder-Mead')
     # psf reconstructed without a saturation limit
-    psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling,
+    psf_psfr_super, center_list_psfr_super, mask_list, amplitude_list_super = psfr.stack_psf(star_list_webb, oversampling=oversampling,
                                                                        saturation_limit=None, num_iteration=10,
                                                                        n_recenter=20)
 
@@ -269,12 +269,12 @@ def test_noisy_psf():
         star_noisy = star + star_n1 + star_n2
         star_list_webb_noisy.append(star_noisy)
 
-    psf_psfr_super_noisy, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb_noisy,
+    psf_psfr_super_noisy, center_list_psfr_super_sat, mask_list_sat, amplitude_list_noisy = psfr.stack_psf(star_list_webb_noisy,
                                                                                      oversampling=oversampling,
                                                                                      saturation_limit=None,
                                                                                      num_iteration=10,
                                                                                      n_recenter=5)
-    psf_psfr_super, center_list_psfr_super_sat, mask_list_sat = psfr.stack_psf(star_list_webb,
+    psf_psfr_super, center_list_psfr_super_sat, mask_list_sat, amplitude_list = psfr.stack_psf(star_list_webb,
                                                                                oversampling=oversampling,
                                                                                saturation_limit=None, num_iteration=10,
                                                                                n_recenter=20)

@@ -25,7 +25,7 @@ def test_reconstruct_psf():
         star = psfr.shift_psf(psf_center=kernel, oversampling=5, shift=[x_shift, y_shift], degrade=True, n_pix_star=kernel.shape[0]/oversampling)
         star_list_webb.append(star)
 
-    psf_psfr_super, center_list_psfr_super, mask_list = psfr.stack_psf(star_list_webb, oversampling=oversampling, 
+    psf_psfr_super, center_list_psfr_super, mask_list, amplitude_list = psfr.stack_psf(star_list_webb, oversampling=oversampling,
                                                   saturation_limit=None, num_iteration=10, 
                                                   n_recenter=20)
                                                 
