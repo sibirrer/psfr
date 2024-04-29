@@ -110,7 +110,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
     else:
         mask_list_one_step = None
     for j in range(num_iteration):
-        psf_guess = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list_one_step,
+        psf_guess, amplitude_list = one_step_psf_estimate(star_list, psf_guess, center_list, mask_list_one_step,
                                           error_map_list=error_map_list, oversampling=oversampling,
                                           **kwargs_psf_stacking, **kwargs_one_step)
         if j % n_recenter == 0 and j != 0:
@@ -145,7 +145,7 @@ def stack_psf(star_list, oversampling=1, mask_list=None, error_map_list=None, sa
         anim.save(animation_options['output_dir'])
         plt.close()
 
-    return psf_guess, center_list, mask_list
+    return psf_guess, center_list, mask_list, amplitude_list
 
 
 def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, error_map_list=None, oversampling=1,
@@ -297,7 +297,7 @@ def one_step_psf_estimate(star_list, psf_guess, center_list, mask_list=None, err
                              amplitude_list=amplitude_list, error_map_list=error_map_list_psf,
                              **psf_stacking_options)
     kernel_new = kernel_util.cut_psf(kernel_new, psf_size=len(psf_guess))
-    return kernel_new
+    return kernel_new, amplitude_list
 
 
 def psf_error_map(star_list, psf_kernel, center_list, mask_list=None, error_map_list=None, oversampling=1):

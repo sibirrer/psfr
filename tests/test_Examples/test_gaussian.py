@@ -50,7 +50,7 @@ def stack_psf_guassian_high_res(oversampling, num_stars, kwargs_one_step, num_it
         star = oversampled2regular(star, oversampling=oversampling_compute)
         star_list.append(star)
 
-    psf_after, center_list_after, mask_list = stack_psf(star_list, oversampling=oversampling,
+    psf_after, center_list_after, mask_list,amplitude_list = stack_psf(star_list, oversampling=oversampling,
                                                         saturation_limit=None, num_iteration=num_iteration,
                                                         n_recenter=n_recenter, verbose=False, kwargs_one_step=kwargs_one_step)
 
