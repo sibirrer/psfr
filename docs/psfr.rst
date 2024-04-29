@@ -28,6 +28,14 @@ psfr.util module
    :undoc-members:
    :show-inheritance:
 
+psfr.verbose\_util module
+-------------------------
+
+.. automodule:: psfr.verbose_util
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

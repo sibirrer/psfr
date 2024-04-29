@@ -67,7 +67,7 @@ docs: ## generate Sphinx HTML documentation, including API docs
 	sphinx-apidoc -o docs/ psfr
 	MAKE -C docs clean
 	MAKE -C docs html
-	BROWSER docs/_build/html/index.html
+	open docs/_build/html/index.html
 
 
 pypi-upload:

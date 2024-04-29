@@ -536,7 +536,8 @@ def centroid_fit(data, model, mask=None, variance=None, oversampling=1, optimize
         Variance in the uncorrelated uncertainties in the data for individual pixels
     oversampling : integer >= 1
         oversampling factor per axis of the model relative to the data and coordinate shift
-    optimizer_type: 'Nelder-Mead' or 'PSO'
+    optimizer_type: string
+        'Nelder-Mead' or 'PSO'
 
     Returns
     -------
