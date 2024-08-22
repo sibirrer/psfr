@@ -66,7 +66,7 @@ The algorithm to iteratively propose a (optionally oversampled) PSF from a set o
 
 (5) Apply an inverse sub-pixel shift of the residuals to be focused on the center of the pixel
 
-(6) Based on teh inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
+(6) Based on the inverse shifted residuals of a set of fixed stars, propose a correction to the previous PSF model
 
 (7) Repeat step (3) - (6) multiple times with the option to repeat step (2)
 
