@@ -423,7 +423,7 @@ def luminosity_centring(star):
     -------
     star_shift : luminosity centered star
     """
-    x_grid, y_grid = util.make_grid(numPix=len(star), deltapix=1, left_lower=False)
+    x_grid, y_grid = util.make_grid(num_pix=len(star), delta_pix=1, left_lower=False)
     x_grid, y_grid = util.array2image(x_grid), util.array2image(y_grid)
     x_c, y_c = np.sum(star * x_grid) / np.sum(star), np.sum(star * y_grid) / np.sum(star)
     # c_ = (len(star) - 1) / 2

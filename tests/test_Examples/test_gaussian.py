@@ -9,19 +9,19 @@ def stack_psf_guassian_high_res(oversampling, num_stars, kwargs_one_step, num_it
     """"
     """
     from lenstronomy.LightModel.light_model import LightModel
-    numpix = 21
+    num_pix = 21
     oversampling_compute = 5
 
-    numpix_super = numpix * oversampling * oversampling_compute
+    numpix_super = num_pix * oversampling * oversampling_compute
     if numpix_super % 2 == 0:
         numpix_super -= 1
 
-    numpix_grid = numpix * oversampling_compute
+    numpix_grid = num_pix * oversampling_compute
     if numpix_grid % 2 == 0:
         numpix_grid -= 1
 
-    x_grid, y_grid = util.make_grid(numPix=numpix_grid, deltapix=1. / oversampling_compute, left_lower=False)
-    x_grid_super, y_grid_super = util.make_grid(numPix=numpix_super, deltapix=1. / oversampling / oversampling_compute,
+    x_grid, y_grid = util.make_grid(num_pix=numpix_grid, delta_pix=1. / oversampling_compute, left_lower=False)
+    x_grid_super, y_grid_super = util.make_grid(num_pix=numpix_super, delta_pix=1. / oversampling / oversampling_compute,
                                                 left_lower=False)
     gauss = LightModel(['GAUSSIAN'])
     sigma = 1
