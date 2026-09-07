@@ -12,3 +12,9 @@ History
 ------------------
 
 * First stable release.
+
+
+0.1.1 (2026-09-07)
+------------------
+
+* Updates to latest lenstronomy version
