@@ -23,15 +23,15 @@ def test_shift_psf():
 
     from lenstronomy.LightModel.light_model import LightModel
     gauss = LightModel(['GAUSSIAN'])
-    numpix = 21
-    num_pix_super = numpix * oversampling
+    num_pix = 21
+    num_pix_super = num_pix * oversampling
     oversampling = 4
     if oversampling % 2 == 0:
         num_pix_super += 1
     sigma = 2
     kwargs_true = [{'amp': 1, 'sigma': sigma, 'center_x': 0, 'center_y': 0}]
     kwargs_shifted = [{'amp': 1, 'sigma': sigma, 'center_x': x, 'center_y': y}]
-    x_grid_super, y_grid_super = util.make_grid(numPix=num_pix_super, deltapix=1. / oversampling,
+    x_grid_super, y_grid_super = util.make_grid(num_pix=num_pix_super, delta_pix=1. / oversampling,
                                                 left_lower=False)
     flux_true_super = gauss.surface_brightness(x_grid_super, y_grid_super, kwargs_true)
     psf_true_super = util.array2image(flux_true_super)
@@ -40,9 +40,9 @@ def test_shift_psf():
     psf_shifted_super_true = gauss.surface_brightness(x_grid_super, y_grid_super, kwargs_shifted)
     psf_shifted_super_true = util.array2image(psf_shifted_super_true)
     psf_shifted_true = kernel_util.degrade_kernel(psf_shifted_super_true, degrading_factor=oversampling)
-    psf_shifted_true = kernel_util.cut_psf(psf_shifted_true, numpix)
+    psf_shifted_true = kernel_util.cut_psf(psf_shifted_true, num_pix)
 
-    psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=numpix, order=2)
+    psf_shifted_psfr = psfr.shift_psf(psf_true_super, oversampling, shift, degrade=True, n_pix_star=num_pix, order=2)
 
     if False:
         f, axes = plt.subplots(1, 2, figsize=(4 * 2, 4))
@@ -83,9 +83,9 @@ def test_linear_amplitude():
 
 def test_fit_centroid():
     from lenstronomy.LightModel.light_model import LightModel
-    numpix = 41
+    num_pix = 41
 
-    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
+    x_grid, y_grid = util.make_grid(num_pix=num_pix, delta_pix=1)
     gauss = LightModel(['GAUSSIAN'])
     x_c, y_c = -3.5, 2.2
     kwargs_true = [{'amp': 2, 'sigma': 3, 'center_x': x_c, 'center_y': y_c}]
@@ -110,9 +110,9 @@ def test_fit_centroid():
 
 def test_fit_centroid_pso():
     from lenstronomy.LightModel.light_model import LightModel
-    numpix = 41
+    num_pix = 41
 
-    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
+    x_grid, y_grid = util.make_grid(num_pix=num_pix, delta_pix=1)
     gauss = LightModel(['GAUSSIAN'])
     x_c, y_c = -3.5, 2.2
     kwargs_true = [{'amp': 2, 'sigma': 3, 'center_x': x_c, 'center_y': y_c}]
@@ -136,9 +136,9 @@ def test_fit_centroid_pso():
 
 
 def test_one_step_psf_estimation():
-    numpix = 21
-    n_c = (numpix - 1) / 2
-    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1, left_lower=True)
+    num_pix = 21
+    n_c = (num_pix - 1) / 2
+    x_grid, y_grid = util.make_grid(num_pix=21, delta_pix=1, left_lower=True)
     gauss = LightModel(['GAUSSIAN'])
     x_c, y_c = -0.6, 0.2
     sigma = 1
@@ -171,11 +171,11 @@ def test_one_step_psf_estimation():
     assert diff_after < diff_before
 
     oversampling = 2
-    numpix_super = numpix * oversampling
+    numpix_super = num_pix * oversampling
     if oversampling % 2 == 0:
         numpix_super -= 1
 
-    x_grid_super, y_grid_super = util.make_grid(numPix=numpix_super, deltapix=1. / oversampling, left_lower=True)
+    x_grid_super, y_grid_super = util.make_grid(num_pix=numpix_super, delta_pix=1. / oversampling, left_lower=True)
     flux_guess_super = gauss.surface_brightness(x_grid_super, y_grid_super, kwargs_guess)
     psf_guess_super = util.array2image(flux_guess_super)
     psf_guess_super /= np.sum(psf_guess_super)
@@ -340,7 +340,7 @@ def test_combine_psf():
 
 def test_luminosity_centring():
     gauss = LightModel(['GAUSSIAN'])
-    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1., left_lower=False)
+    x_grid, y_grid = util.make_grid(num_pix=21, delta_pix=1., left_lower=False)
     kwargs_guess = [{'amp': 1, 'sigma': 1.2, 'center_x': -0.5, 'center_y': 0.5}]
     flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_guess)
     star = util.array2image(flux_guess)
@@ -354,7 +354,7 @@ def test_luminosity_centring():
 
 def test_centroid_fit():
     gauss = LightModel(['GAUSSIAN'])
-    x_grid, y_grid = util.make_grid(numPix=21, deltapix=1., left_lower=False)
+    x_grid, y_grid = util.make_grid(num_pix=21, delta_pix=1., left_lower=False)
     kwargs_data = [{'amp': 1, 'sigma': 1.2, 'center_x': -0.5, 'center_y': 0.5}]
     flux_guess = gauss.surface_brightness(x_grid, y_grid, kwargs_data)
     data = util.array2image(flux_guess)
@@ -374,9 +374,9 @@ def test_centroid_fit():
 
 def test_psf_error_map():
     from lenstronomy.LightModel.light_model import LightModel
-    numpix = 11
+    num_pix = 11
 
-    x_grid, y_grid = util.make_grid(numPix=numpix, deltapix=1)
+    x_grid, y_grid = util.make_grid(num_pix=num_pix, delta_pix=1)
     gauss = LightModel(['GAUSSIAN'])
     kwargs_model = [{'amp': 1, 'sigma': 1.5, 'center_x': 0, 'center_y': 0}]
     flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
@@ -384,7 +384,7 @@ def test_psf_error_map():
 
     star_list, center_list, error_map_list, mask_list = [], [], [], []
     for i in range(100):
-        star = psf_kernel * i + np.random.randn(numpix, numpix)
+        star = psf_kernel * i + np.random.randn(num_pix, num_pix)
         center_list.append([0, 0])
         star_list.append(star)
         error_map_list.append(np.ones_like(star) * 5)

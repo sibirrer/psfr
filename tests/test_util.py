@@ -7,8 +7,8 @@ from lenstronomy.Util import util as lenstronomy_util
 
 def test_regular2oversampled():
     from lenstronomy.LightModel.light_model import LightModel
-    numpix = 41
-    x_grid, y_grid = lenstronomy_util.make_grid(numPix=numpix, deltapix=1)
+    num_pix = 41
+    x_grid, y_grid = lenstronomy_util.make_grid(num_pix=num_pix, delta_pix=1)
     gauss = LightModel(['GAUSSIAN'])
     kwargs_model = [{'amp': 1, 'sigma': 3, 'center_x': 0, 'center_y': 0}]
     flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
@@ -19,7 +19,7 @@ def test_regular2oversampled():
         image_oversampled = util.regular2oversampled(image, oversampling=oversampling)
         # check that surface brightness is conserved
         npt.assert_almost_equal(np.sum(image_oversampled), np.sum(image), decimal=5)
-        n_pix = numpix * oversampling
+        n_pix = num_pix * oversampling
         if n_pix % 2 == 0:
             n_pix -= 1
         # check length
@@ -45,8 +45,8 @@ def test_oversampled2data():
 
 def test_regular2oversampled_inverse():
     from lenstronomy.LightModel.light_model import LightModel
-    numpix = 41
-    x_grid, y_grid = lenstronomy_util.make_grid(numPix=numpix, deltapix=1)
+    num_pix = 41
+    x_grid, y_grid = lenstronomy_util.make_grid(num_pix=num_pix, delta_pix=1)
     gauss = LightModel(['GAUSSIAN'])
     kwargs_model = [{'amp': 1, 'sigma': 3, 'center_x': 0, 'center_y': 0}]
     flux_true = gauss.surface_brightness(x_grid, y_grid, kwargs_model)
